@@ -1,0 +1,26 @@
+/* ===== 🐍 مار غذایی (Snake Game) ===== */
+.sn-wrapper { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 8px 4px 16px; }
+.sn-title { font-size: 1.5rem; text-align: center; margin: 0; background: linear-gradient(135deg, #00ff88, #00cc66); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.sn-stats { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.sn-stat { display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,0.05); border: 1px solid rgba(0,255,136,0.2); border-radius: 10px; padding: 6px 14px; min-width: 60px; }
+.sn-stat-label { font-size: 0.65rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+.sn-stat-value { font-size: 1.1rem; font-weight: 800; color: #00ff88; font-variant-numeric: tabular-nums; }
+.sn-game-area { position: relative; }
+#snakeCanvas { border: 2px solid rgba(0,255,136,0.3); border-radius: 8px; box-shadow: 0 0 20px rgba(0,255,136,0.1); max-width: 100%; height: auto; }
+.sn-overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(5,5,20,0.88); border-radius: 8px; gap: 10px; z-index: 5; }
+.sn-overlay-text { font-size: 1.5rem; font-weight: 800; color: #fff; text-shadow: 0 0 15px rgba(0,255,136,0.6); }
+.sn-final-score { font-size: 1.2rem; color: #00ff88; }
+.sn-final-info { font-size: 0.85rem; color: #aaa; }
+.sn-high { font-size: 0.75rem; color: #ffcc00; }
+.sn-hint { font-size: 0.8rem; color: #888; text-align: center; max-width: 220px; }
+.sn-controls-hint { font-size: 0.65rem; color: #666; }
+.sn-btn { border: none; border-radius: 12px; padding: 10px 28px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+.sn-btn-start { background: linear-gradient(135deg, #00ff88, #00cc66); color: #000; box-shadow: 0 4px 15px rgba(0,255,136,0.4); }
+.sn-btn-start:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,255,136,0.6); }
+.sn-controls { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 6px; }
+.sn-ctrl-row { display: flex; gap: 6px; }
+.sn-ctrl-btn { width: 52px; height: 52px; border: 2px solid rgba(0,255,136,0.3); border-radius: 12px; background: rgba(255,255,255,0.06); color: #00ff88; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent; user-select: none; }
+.sn-ctrl-btn:active { background: rgba(0,255,136,0.2); transform: scale(0.92); }
+.sn-pause-btn { background: rgba(255,204,0,0.1); border-color: rgba(255,204,0,0.3); color: #ffcc00; }
+.sn-reward-notice { font-size: 0.8rem; color: #00ff88; text-align: center; min-height: 20px; }
+@media (max-width: 420px) { .sn-ctrl-btn { width: 58px; height: 58px; font-size: 1.4rem; } }

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>🚀 نقشه راه ارتقای Ajorpareh — API ها و سرویس‌ها</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700;900&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Vazirmatn',sans-serif; background:#070d14; color:#eaf2ff; padding:24px 14px;
+    background-image: radial-gradient(circle at 10% 5%, rgba(34,230,226,.08), transparent 40%), radial-gradient(circle at 90% 95%, rgba(255,64,129,.06), transparent 40%); }
+  .wrap { max-width:860px; margin:0 auto; }
+  header { text-align:center; margin-bottom:26px; }
+  .logo { font-size:52px; }
+  h1 { font-size:26px; font-weight:900; background:linear-gradient(90deg,#22e6e2,#ffd54f); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin:6px 0 4px; }
+  .sub { color:#8a93a6; font-size:13px; }
+  .tag { display:inline-block; border-radius:999px; padding:4px 12px; font-size:11px; font-weight:700; margin:3px 2px; }
+  .tag.free { background:rgba(34,230,226,.12); color:#22e6e2; border:1px solid rgba(34,230,226,.3); }
+  .tag.key { background:rgba(255,213,79,.12); color:#ffd54f; border:1px solid rgba(255,213,79,.3); }
+  .tag.nokey { background:rgba(129,199,132,.12); color:#81c784; border:1px solid rgba(129,199,132,.3); }
+  .tag.hot { background:rgba(255,64,129,.15); color:#ff80ab; border:1px solid rgba(255,64,129,.4); }
+  section { background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:18px; margin-bottom:16px; }
+  section h2 { font-size:17px; font-weight:800; margin-bottom:6px; color:#ffd54f; }
+  section h2 span { margin-left:6px; }
+  .desc { color:#8a93a6; font-size:12.5px; margin-bottom:12px; }
+  table { width:100%; border-collapse:collapse; font-size:12.5px; }
+  th { text-align:right; color:#22e6e2; font-weight:800; padding:8px 6px; border-bottom:1px solid rgba(34,230,226,.25); font-size:12px; }
+  td { padding:8px 6px; border-bottom:1px solid rgba(255,255,255,.05); vertical-align:top; line-height:1.7; }
+  td b { color:#eaf2ff; }
+  .limit { color:#8a93a6; font-size:11px; }
+  .url { direction:ltr; display:inline-block; color:#22e6e2; font-size:11px; background:rgba(0,0,0,.3); padding:1px 8px; border-radius:6px; }
+  .callout { background:rgba(255,213,79,.07); border:1px solid rgba(255,213,79,.25); border-radius:14px; padding:12px 16px; font-size:13px; color:#ffe9a8; line-height:2; }
+  .callout b { color:#ffd54f; }
+  .ok { color:#81c784; font-weight:700; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  @media(max-width:600px){ .grid2 { grid-template-columns:1fr; } }
+  .idea { background:rgba(34,230,226,.05); border:1px solid rgba(34,230,226,.2); border-radius:12px; padding:12px; }
+  .idea h3 { font-size:14px; color:#22e6e2; margin-bottom:6px; }
+  .idea p { font-size:12px; color:#b9c8dd; line-height:1.9; }
+  footer { text-align:center; color:#5a6472; font-size:11px; margin-top:20px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">🧱</div>
+    <h1>نقشه راه ارتقای آجُرپاره</h1>
+    <div class="sub">هر API و سرویسی که می‌تونی به ربات وصل کنی — با محدودیت‌ها و محل گرفتن کلید</div>
+  </header>
+
+  <section>
+    <h2><span>✅</span> چیزی که الان داری</h2>
+    <div class="desc">این سرویس‌ها همین الان توی رباتت فعال‌ان — بدون نیاز به کار جدید:</div>
+    <div>
+      <span class="tag key">Gemini (گفتگو+تصویر+صدا)</span>
+      <span class="tag key">Groq (سریع + Whisper)</span>
+      <span class="tag key">OpenRouter (Fallback)</span>
+      <span class="tag key">audd.io (تشخیص آهنگ)</span>
+      <span class="tag nokey">Audius (دانلود موزیک)</span>
+      <span class="tag nokey">Deezer + iTunes (پیش‌نمایش)</span>
+      <span class="tag nokey">Cobalt (دانلود یوتیوب)</span>
+      <span class="tag nokey">yt-dlp (۴۰+ سایت)</span>
+      <span class="tag nokey">MongoDB Atlas (دیتابیس)</span>
+      <span class="tag nokey">Telegram Bot API (وب‌هوک)</span>
+    </div>
+  </section>
+
+  <section>
+    <h2><span>🆓</span> بدون کلید — همین حالا قابل استفاده</h2>
+    <div class="desc">این‌ها هیچ کلیدی نمی‌خوان؛ فقط کدشون رو اضافه می‌کنم و تمام! 🎉</div>
+    <table>
+      <tr><th>سرویس</th><th>چی کار می‌کنه</th><th>محدودیت</th><th>ایده در ربات</th></tr>
+      <tr><td><b>Open-Meteo</b> <span class="tag nokey">رایگان</span></td><td>آب‌وهوای هر شهر (دمای لحظه‌ای، بارش، باد، ۷ روز آینده)</td><td class="limit">۱۰,۰۰۰ درخواست/روز</td><td>☀️ <b>/weather تهران</b> — وضعیت هوای هر شهر</td></tr>
+      <tr><td><b>Frankfurter</b> <span class="tag nokey">رایگان</span></td><td>نرخ ارز جهانی (دلار، یورو، پوند و...)</td><td class="limit">نامحدود</td><td>💱 <b>/rate usd eur</b> — تبدیل ارز</td></tr>
+      <tr><td><b>CoinGecko</b> <span class="tag nokey">رایگان</span></td><td>قیمت لحظه‌ای ۱۰,۰۰۰+ ارز دیجیتال</td><td class="limit">۳۰ درخواست/دقیقه</td><td>🪙 <b>/crypto btc</b> — قیمت بیت‌کوین و... (عالی برای کانال USDT)</td></tr>
+      <tr><td><b>Wikipedia</b> <span class="tag nokey">رایگان</span></td><td>جستجو و خلاصه مقالات (فارسی هم داره)</td><td class="limit">نامحدود (مودب)</td><td>📚 <b>/wiki نوروز</b> — خلاصه مقاله</td></tr>
+      <tr><td><b>JokeAPI</b> <span class="tag nokey">رایگان</span></td><td>جوک‌های نامحدود انگلیسی</td><td class="limit">۱۲۰/دقیقه</td><td>😂 جوک‌دونی بی‌نهایت</td></tr>
+      <tr><td><b>quotable.io</b> <span class="tag nokey">رایگان</span></td><td>جملات انگیزشی/معروف</td><td class="limit">نامحدود</td><td>✨ /quote از منبع زنده</td></tr>
+      <tr><td><b>Open Trivia DB</b> <span class="tag nokey">رایگان</span></td><td>سوالات کوئیز (۱۶ دسته)</td><td class="limit">نامحدود</td><td>🧠 کوئیز واقعی و متنوع</td></tr>
+      <tr><td><b>REST Countries</b> <span class="tag nokey">رایگان</span></td><td>اطلاعات همه کشورها (پرچم، پایتخت، جمعیت)</td><td class="limit">نامحدود</td><td>🌍 <b>/country ایران</b></td></tr>
+      <tr><td><b>ip-api.com</b> <span class="tag nokey">رایگان</span></td><td>موقعیت‌یابی IP</td><td class="limit">۴۵/دقیقه</td><td>📍 بررسی امنیت لینک + موقعیت</td></tr>
+      <tr><td><b>World Time API</b> <span class="tag nokey">رایگان</span></td><td>ساعت هر منطقه زمانی</td><td class="limit">نامحدود</td><td>🕐 <b>/time tehran newyork</b></td></tr>
+      <tr><td><b>PokéAPI</b> <span class="tag nokey">رایگان</span></td><td>همه پوکمون‌ها</td><td class="limit">نامحدود</td><td>🎮 بازی/فان</td></tr>
+      <tr><td><b>Open Library</b> <span class="tag nokey">رایگان</span></td><td>جستجوی کتاب (۲۰ میلیون)</td><td class="limit">نامحدود</td><td>📖 <b>/book نام کتاب</b></td></tr>
+      <tr><td><b>MusicBrainz</b> <span class="tag nokey">رایگان</span></td><td>دیتابیس کامل موسیقی (خواننده، آلبوم)</td><td class="limit">مودب</td><td>🎵 اطلاعات کامل خواننده</td></tr>
+      <tr><td><b>Have I Been Pwned</b> <span class="tag nokey">رایگان</span></td><td>بررسی لو رفتن ایمیل/شماره در هک‌ها</td><td class="limit">نامحدود</td><td>🔐 <b>/breach email</b> — امنیت</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2><span>🔑</span> با کلید رایگان — کجا بری بگیریش</h2>
+    <div class="desc">ثبت‌نام ساده با ایمیل؛ کلید رو توی Railway Variables می‌ذاریم و وصل می‌کنیم:</div>
+    <table>
+      <tr><th>سرویس</th><th>چی کار می‌کنه</th><th>محدودیت رایگان</th><th>محل گرفتن کلید</th></tr>
+      <tr><td><b>OpenWeatherMap</b> <span class="tag key">کلید</span></td><td>آب‌وهوای دقیق با آیکن</td><td class="limit">۱,۰۰۰/روز</td><td class="url">openweathermap.org</td></tr>
+      <tr><td><b>TMDB</b> <span class="tag key">کلید</span></td><td>فیلم‌ها و سریال‌ها (پوستر، توضیح، امتیاز)</td><td class="limit">۴۰/۱۰ ثانیه</td><td class="url">themoviedb.org</td></tr>
+      <tr><td><b>ElevenLabs</b> <span class="tag hot">پرطرفدار</span></td><td>تبدیل متن به <b>صدا</b> (۱۰۰+ صدا، فارسی هم داره)</td><td class="limit">~۱۰ دقیقه صدا/ماه</td><td class="url">elevenlabs.io</td></tr>
+      <tr><td><b>ExchangeRate-API</b> <span class="tag key">کلید</span></td><td>نرخ ارز ۱۶۰ ارز</td><td class="limit">۱,۵۰۰/ماه</td><td class="url">exchangerate-api.com</td></tr>
+      <tr><td><b>NASA</b> <span class="tag key">کلید</span></td><td>عکس روز فضا، مریخ و... </td><td class="limit">۱,۰۰۰/ساعت</td><td class="url">api.nasa.gov</td></tr>
+      <tr><td><b>Hugging Face</b> <span class="tag key">کلید</span></td><td>هزاران مدل AI رایگان (ترجمه، خلاصه، OCR...)</td><td class="limit">محدود</td><td class="url">huggingface.co</td></tr>
+      <tr><td><b>VirusTotal</b> <span class="tag key">کلید</span></td><td>اسکن فایل/لینک با ۷۰+ آنتی‌ویروس</td><td class="limit">۴/دقیقه</td><td class="url">virustotal.com</td></tr>
+      <tr><td><b>Alpha Vantage</b> <span class="tag key">کلید</span></td><td>سهام و بازار</td><td class="limit">۲۵/روز</td><td class="url">alphavantage.co</td></tr>
+      <tr><td><b>Resend</b> <span class="tag key">کلید</span></td><td>ارسال ایمیل</td><td class="limit">۳,۰۰۰/ماه</td><td class="url">resend.com</td></tr>
+      <tr><td><b>NewsAPI</b> <span class="tag key">کلید</span></td><td>اخبار (فقط دیروز!)</td><td class="limit">۱۰۰/روز</td><td class="url">newsapi.org</td></tr>
+      <tr><td><b>Google Translate API</b> <span class="tag key">کلید</span></td><td>ترجمه حرفه‌ای (الان Gemini ترجمه می‌کنه)</td><td class="limit">۵۰۰K کاراکتر/ماه</td><td class="url">cloud.google.com</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2><span>🗄</span> ارتقای دیتابیس و زیرساخت</h2>
+    <div class="desc">چیزهایی که ربات رو سریع‌تر و مطمئن‌تر می‌کنن:</div>
+    <div class="grid2">
+      <div class="idea"><h3>⚡ Redis (کش)</h3><p>ذخیره موقت پاسخ‌ها (مثل نرخ ارز، آب‌وهوا) تا ۱۰۰ برابر سریع‌تر و کم‌هزینه‌تر. <b>Upstash</b> نسخه رایگان داره: upstash.com</p></div>
+      <div class="idea"><h3>☁️ Cloudflare R2 / Backblaze B2</h3><p>فضای ذخیره فایل‌های بزرگ ربات (۱۰ گیگ رایگان در B2). برای فایل‌های اشتراکی و آپلود. backblaze.com</p></div>
+      <div class="idea"><h3>🔍 MongoDB Atlas (بهتر)</h3><p>الان رایگان (۵۱۲MB) داری؛ اگه بزرگ شد: ایندکس‌گذاری، جستجوی متنی و Full-Text Search. mongodb.com</p></div>
+      <div class="idea"><h3>🖥 سرور لوکال Bot API</h3><p>سقف ۲ گیگابایت — کدش آماده‌ست، فقط api_id می‌خواد (همون که داری از my.telegram.org می‌گیری)</p></div>
+      <div class="idea"><h3>⭐ Telegram Stars</h3><p>سیستم پرداخت داخلی تلگرام برای فروش چیزای دیجیتال (سرویس، هدیه). BotFather → Payments فعالش کن</p></div>
+      <div class="idea"><h3>🤖 Telegram Gateway API</h3><p>ارسال کد تأیید به شماره‌های کاربران از طریق تلگرام (برای احراز هویت)</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span>💡</span> پیشنهادهای من — بگو کدومو بسازم؟</h2>
+    <div class="desc">رتبه‌بندی از نظر «خفن‌بودن ÷ سختی ÷ فایده» برای ربات فارسی:</div>
+    <table>
+      <tr><th>#</th><th>فیچر</th><th>API</th><th>سختی</th><th>چرا خفنه؟</th></tr>
+      <tr><td>۱</td><td><b>🎤 متن به صدا (TTS)</b></td><td>ElevenLabs / Gemini TTS</td><td>آسان</td><td class="ok">کاربر متن بده، ربات ویس فارسی بفرسته — خیلی محبوبه</td></tr>
+      <tr><td>۲</td><td><b>☀️ آب‌وهوای شهرها</b></td><td>Open-Meteo (بدون کلید!)</td><td>آسان</td><td class="ok">همین الان می‌تونم بسازمش</td></tr>
+      <tr><td>۳</td><td><b>💱 نرخ ارز + 🪙 کریپتو</b></td><td>Frankfurter + CoinGecko (بدون کلید)</td><td>آسان</td><td class="ok">برای کانال‌ت عالیه — هر ساعت پست خودکار</td></tr>
+      <tr><td>۴</td><td><b>🎬 جستجوی فیلم و سریال</b></td><td>TMDB (کلید رایگان)</td><td>آسان</td><td>پوستر + امتیاز + توضیح فارسی‌شده با Gemini</td></tr>
+      <tr><td>۵</td><td><b>📖 خلاصه ویکی‌پدیا</b></td><td>Wikipedia (بدون کلید)</td><td>آسان</td><td>دانستنی + انشا با Gemini</td></tr>
+      <tr><td>۶</td><td><b>🔐 بررسی لو‌رفتن ایمیل</b></td><td>Have I Been Pwned (بدون کلید)</td><td>آسان</td><td>امنیت — جذاب برای گروه‌ها</td></tr>
+      <tr><td>۷</td><td><b>🧠 کوئیز نامحدود واقعی</b></td><td>Open Trivia DB (بدون کلید)</td><td>متوسط</td><td>جای کوئیز ثابت فعلی</td></tr>
+      <tr><td>۸</td><td><b>⭐ فروش با Telegram Stars</b></td><td>Bot Payments</td><td>متوسط</td><td>درآمد مستقیم از سرویس‌ها</td></tr>
+      <tr><td>۹</td><td><b>🖼 هوش مصنوعی عکس (ویرایش، آپ‌اسکال، OCR)</b></td><td>Gemini (داریش!)</td><td>آسان</td><td>از عکس متن دربیار، بزرگ‌تر کن — فقط رابطش رو بسازم</td></tr>
+      <tr><td>۱۰</td><td><b>⚡ کش Redis</b></td><td>Upstash (رایگان)</td><td>متوسط</td><td>سرعت + صرفه‌جویی</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <div class="callout">
+      🎯 <b>نتیجه‌گیری:</b> سه تا از خفن‌ترین چیزها <b>همین الان بدون هیچ کلیدی</b> قابل ساختن‌ان: <b>آب‌وهوا</b>، <b>نرخ ارز + کریپتو</b> و <b>خلاصه ویکی‌پدیا</b>.
+      بعدش با یه کلید رایگان: <b>متن به صدا (TTS)</b> و <b>فیلم‌ها (TMDB)</b>.
+      بگو کدومش رو بسازم — چندتاش رو یکجا هم می‌تونم اضافه کنم! 🚀
+    </div>
+  </section>
+
+  <footer>نقشه راه آجُرپاره · بر اساس تحقیق کامل ۲۰۲۶ · همه محدودیت‌ها بررسی شد</footer>
+</div>
+</body>
+</html>

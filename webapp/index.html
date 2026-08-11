@@ -1,0 +1,843 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0a0f" />
+  <meta name="description" content="Mini App ربات آجُرپاره؛ هوش مصنوعی فارسی، دانلود محتوای عمومی، آپلود فایل از URL، بازی، یادآور، جوایز، QR، استیکر و GIF داخل تلگرام." />
+  <meta name="keywords" content="ربات آجرپاره, Ajorparehbot, مینی اپ تلگرام, هوش مصنوعی فارسی, دانلود اینستاگرام تلگرام, آپلود فایل از URL, یادآور تلگرام, بازی تلگرامی, ساخت استیکر و GIF" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+  <meta name="googlebot" content="index, follow" />
+  <meta name="author" content="Ajorpareh" />
+  <link rel="canonical" href="https://ajor2-production.up.railway.app/app/" />
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+  <link rel="manifest" href="site.webmanifest" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="fa_IR" />
+  <meta property="og:site_name" content="Ajorpareh" />
+  <meta property="og:title" content="Mini App آجُرپاره؛ هوش مصنوعی، رسانه و بازی تلگرام" />
+  <meta property="og:description" content="هوش مصنوعی فارسی، دانلود عمومی، آپلود URL، بازی، یادآور، جوایز و ابزارهای کاربردی در Mini App ربات آجُرپاره." />
+  <meta property="og:url" content="https://ajor2-production.up.railway.app/app/" />
+  <meta property="og:image" content="https://ajor2-production.up.railway.app/app/assets/og-cover.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Mini App فارسی ربات آجُرپاره" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Mini App ربات آجُرپاره | Ajorparehbot" />
+  <meta name="twitter:description" content="هوش مصنوعی، رسانه، بازی و ابزارهای کاربردی فارسی داخل تلگرام" />
+  <meta name="twitter:image" content="https://ajor2-production.up.railway.app/app/assets/og-cover.jpg" />
+
+  <title>Mini App آجُرپاره | هوش مصنوعی، دانلود و بازی تلگرام</title>
+  <link rel="preload" as="image" href="assets/ajor-mascot.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Vazirmatn:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=20260806-music-daily" />
+  <link rel="stylesheet" href="hokm.css?v=1" />
+  <link rel="stylesheet" href="ajorchin.css?v=1" />
+  <link rel="stylesheet" href="snake.css?v=1" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": "https://ajor2-production.up.railway.app/app/#webpage",
+        "url": "https://ajor2-production.up.railway.app/app/",
+        "name": "Mini App آجُرپاره",
+        "description": "Mini App فارسی ربات آجُرپاره برای هوش مصنوعی، رسانه، بازی، یادآور، جوایز و ابزارهای تلگرام",
+        "inLanguage": "fa-IR",
+        "isPartOf": {"@id": "https://ajor2-production.up.railway.app/#website"},
+        "about": {"@id": "https://ajor2-production.up.railway.app/#bot"}
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://ajor2-production.up.railway.app/#organization",
+        "name": "Ajorpareh",
+        "url": "https://ajor2-production.up.railway.app/",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://ajor2-production.up.railway.app/app/assets/icon-512.png",
+          "width": 512,
+          "height": 512
+        },
+        "sameAs": ["https://t.me/Ajor_pareh", "https://t.me/Ajorparehbot"]
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://ajor2-production.up.railway.app/app/#application",
+        "name": "Ajorpareh Telegram Mini App",
+        "alternateName": "مینی اپ آجُرپاره",
+        "applicationCategory": "UtilitiesApplication",
+        "operatingSystem": "Web, Telegram",
+        "url": "https://ajor2-production.up.railway.app/app/",
+        "installUrl": "https://t.me/Ajorparehbot?start=miniapp",
+        "description": "هوش مصنوعی فارسی، دانلود عمومی، آپلود URL، بازی، یادآور، QR، استیکر، GIF، جوایز و پشتیبانی داخل تلگرام",
+        "featureList": ["هوش مصنوعی فارسی", "مرکز رسانه و لینک", "بازی و جایزه", "یادآور شخصی", "QR، استیکر و GIF"],
+        "image": "https://ajor2-production.up.railway.app/app/assets/og-cover.jpg",
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "IRR"},
+        "publisher": {"@id": "https://ajor2-production.up.railway.app/#organization"}
+      }
+    ]
+  }
+  </script>
+  <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
+  <script src="hokm.js?v=1" defer></script>
+  <script src="boardgames.js?v=1" defer></script>
+  <script src="ajorchin.js?v=1" defer></script>
+  <script src="snake.js?v=1" defer></script>
+  <script src="app.js?v=20260808-calendar-quiz" defer></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/app/sw.js').catch(() => {});
+    }
+  </script>
+</head>
+<body>
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="i-game" viewBox="0 0 24 24"><path d="M6 11h4M8 9v4m7-1h.01M18 10h.01M8.5 6h7A5.5 5.5 0 0 1 21 11.5v3a3.5 3.5 0 0 1-6 2.45L13.2 15h-2.4L9 16.95A3.5 3.5 0 0 1 3 14.5v-3A5.5 5.5 0 0 1 8.5 6Z"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="m13 2-9 12h8l-1 8 9-12h-8l1-8Z"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21h8m-4-4v4M7 4h10v4a5 5 0 0 1-10 0V4Zm0 2H4v1a4 4 0 0 0 4 4m9-5h3v1a4 4 0 0 1-4 4"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.6 2.6 0 1 1 4.4 1.9c-1 .8-1.9 1.3-1.9 2.6M12 17h.01"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-fire" viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.8 7-7 0-3-1.7-5.3-4.5-7.5.2 2.1-.8 3.4-2 4.2.1-3.9-2.2-6.9-5-9.7.1 3.4-2.5 5.5-2.5 9.5C5 17.5 8 22 12 22Z"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="m13 2-8 11h7l-1 9 8-12h-7l1-8Z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m7-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.87m-2-11.96a4 4 0 0 1 0 7.75"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4M8.6 13.5l6.8 4"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></symbol>
+    <symbol id="i-trend" viewBox="0 0 24 24"><path d="m3 17 6-6 4 4 7-8m-5 0h5v5"/></symbol>
+    <symbol id="i-news" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 1.5 17V5H18v12.5a2 2 0 0 0 4 0V8h-4M5 9h9M5 13h4m2 0h3M5 17h9"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M6.1 9a7 7 0 0 1 11.2-2.2L20 11M4 13l2.7 4.2A7 7 0 0 0 17.9 15"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 3h7v7m0-7-9 9M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4v8Z"/><path d="M8 9h8m-8 4h5"/></symbol>
+    <symbol id="i-bug" viewBox="0 0 24 24"><path d="M8 2h8m-4 0v4M7 9H3m18 0h-4M7 14H3m18 0h-4M8 19l-2 3m10-3 2 3M7 12a5 5 0 0 1 10 0v3a5 5 0 0 1-10 0v-3Z"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4 20-7Z"/><path d="M22 2 11 13"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4L16.5 3.5Z"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 13h4"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></symbol>
+  </svg>
+
+  <div class="preloader" id="preloader" aria-live="polite">
+    <div class="loader-burst loader-burst-one"></div>
+    <div class="loader-burst loader-burst-two"></div>
+    <img src="assets/ajor-mascot.png" alt="" class="preloader-mascot" />
+    <strong>Ajorpareh</strong>
+    <span>داریم حال خوب رو لود می‌کنیم...</span>
+    <div class="loader-track"><i></i></div>
+  </div>
+
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <div class="welcome-pop" id="welcomePop" role="status" aria-live="polite" aria-hidden="true">
+    <button id="welcomeClose" type="button" aria-label="بستن"><svg><use href="#i-close"/></svg></button>
+    <img src="assets/ajor-mascot.png" alt="" />
+    <div><small>خوش اومدی به Ajorpareh</small><b id="welcomeMessage">آماده‌ای بترکونیم؟ ⚡</b></div>
+  </div>
+
+  <div class="app-shell" id="appShell">
+    <div class="top-ticker" aria-label="خبر فوری">
+      <span class="live-dot"></span>
+      <strong>الان داغه</strong>
+      <div class="ticker-copy">چالش «نخندیدن» ۱۲,۴۸۰ بازیکن رو شکست داد!</div>
+      <a href="https://t.me/Ajor_pareh" data-telegram-link>ببینش <svg><use href="#i-arrow-left"/></svg></a>
+    </div>
+
+    <header class="app-header">
+      <a class="brand" href="#games" data-go="games" aria-label="Ajorpareh home">
+        <span class="brand-mark"><img src="assets/ajor-mascot.png" alt="ماسکات آجُرپاره" /></span>
+        <span class="brand-copy">
+          <b>Ajorpareh<span>!</span></b>
+          <small>بازی کن، بخند، رکورد بزن</small>
+        </span>
+      </a>
+
+      <div class="official-links" aria-label="لینک‌های رسمی">
+        <a href="https://t.me/Ajor_pareh" data-telegram-link>
+          <span>کانال رسمی</span>
+          <strong dir="ltr">@Ajor_pareh</strong>
+        </a>
+        <i></i>
+        <a href="https://t.me/Ajorparehbot" data-telegram-link>
+          <span>ربات و پشتیبانی</span>
+          <strong dir="ltr">@Ajorparehbot</strong>
+        </a>
+      </div>
+
+      <button class="points-button" type="button" data-go="profile" aria-label="نمایش امتیازها">
+        <span><svg><use href="#i-bolt"/></svg></span>
+        <div><b data-points>۰</b><small>XP امروز</small></div>
+      </button>
+    </header>
+    <div class="mobile-official-links" aria-label="مسیرهای رسمی">
+      <a href="https://t.me/Ajor_pareh" data-telegram-link><span>کانال</span><b dir="ltr">@Ajor_pareh</b></a>
+      <i></i>
+      <a href="https://t.me/Ajorparehbot" data-telegram-link><span>ربات</span><b dir="ltr">@Ajorparehbot</b></a>
+    </div>
+
+    <section class="daily-context" aria-label="تاریخ، ساعت و مناسبت امروز">
+      <div class="daily-date-icon"><svg><use href="#i-clock"/></svg></div>
+      <div class="daily-date-copy">
+        <span id="persianDate">در حال تنظیم تاریخ تهران...</span>
+        <b id="tehranClock" dir="ltr">--:--:--</b>
+      </div>
+      <i></i>
+      <div class="daily-event-copy">
+        <small>مناسبت امروز</small>
+        <b id="worldOccasion">در حال بررسی تقویم میلادی...</b>
+      </div>
+    </section>
+
+    <section class="mini-daily-tools" aria-label="ابزارهای روزانه و موسیقی">
+      <div class="section-heading compact">
+        <div><span>سرویس‌های روزانه</span><h2>هر روز یک حال خوب ✨</h2></div>
+        <button class="text-link" type="button" data-go="music">موسیقی <svg><use href="#i-arrow-left"/></svg></button>
+      </div>
+      <div class="mini-daily-tools-grid">
+        <button class="mini-daily-tool midnight" type="button" data-open-bot="midnight_greeting"><strong>🌙 ۰۰:۰۰</strong><small>شب بخیر در ربات</small></button>
+        <button class="mini-daily-tool morning" type="button" data-open-bot="morning_greeting"><strong>🌅 صبح بخیر</strong><small>جملهٔ صبحگاهی</small></button>
+        <button class="mini-daily-tool fal" type="button" data-open-bot="daily_fal"><strong>🍷 فال حافظ</strong><small>فال صبحگاهی</small></button>
+        <button class="mini-daily-tool music" type="button" data-go="music"><strong>🎵 موزیک امروز</strong><small>امروز موزیک چی گوش کنیم؟</small></button>
+        <button class="mini-daily-tool playlist" type="button" data-open-bot="iran_playlist"><strong>📚 پلی‌لیست ایرانی</strong><small>شنیدن آهنگ‌های عمومی</small></button>
+      </div>
+    </section>
+
+    <main>
+      <section class="page active" data-page="games" aria-labelledby="games-title">
+        <div class="section-kicker"><span></span> هر روز یه بهونه تازه برای رقابت</div>
+        <div class="hero-grid">
+          <article class="daily-hero">
+            <div class="hero-noise"></div>
+            <div class="hero-content">
+              <div class="hero-meta">
+                <span class="status-chip"><i></i> چالش امروز</span>
+                <span class="time-chip"><svg><use href="#i-clock"/></svg> تا پایان: <b id="countdown">۱۴:۳۲:۰۸</b></span>
+              </div>
+              <h1 id="games-title">می‌تونی <em>نخندی؟</em></h1>
+              <p>۳۰ ثانیه ویدئوی میم می‌بینی؛ هر خنده یعنی باخت. دوربین لازم نیست، فقط با خودت روراست باش!</p>
+              <div class="hero-actions">
+                <button class="btn btn-accent" data-game="laugh"><svg><use href="#i-play"/></svg> شروع چالش</button>
+                <button class="icon-button light" data-share="challenge" aria-label="اشتراک‌گذاری چالش"><svg><use href="#i-share"/></svg></button>
+              </div>
+              <div class="hero-participants">
+                <span class="avatar-stack" aria-hidden="true"><i>س</i><i>م</i><i>ر</i></span>
+                <b>+۱۲.۴K</b> نفر امروز بازی کردن
+              </div>
+            </div>
+            <img src="assets/ajor-mascot.png" class="hero-mascot" alt="ماسکات آجُرپاره در حال بازی" />
+            <span class="sticker sticker-one">LOL</span>
+            <span class="sticker sticker-two">+250</span>
+          </article>
+
+          <aside class="score-panel">
+            <div class="score-head">
+              <div><span>وضعیت امروزت</span><h2>آماده رقابت! 🔥</h2></div>
+              <div class="level-ring"><b id="heroLevel">۱</b><span>LEVEL</span></div>
+            </div>
+            <div class="score-progress">
+              <span><b id="heroPoints">۰ XP</b><small id="heroNextLevel">تا لِول بعد: ۵۰۰</small></span>
+              <div><i id="heroProgress"></i></div>
+            </div>
+            <div class="mini-stats">
+              <div><svg><use href="#i-fire"/></svg><b id="heroStreak">۰ روز</b><span>استریک</span></div>
+              <div><svg><use href="#i-trophy"/></svg><b id="heroRank">#—</b><span>رتبه جهانی</span></div>
+              <div><svg><use href="#i-zap"/></svg><b id="heroWinRate">۰٪</b><span>برد</span></div>
+            </div>
+            <div class="daily-mission" data-go="rewards" role="button" tabindex="0"><span>مأموریت‌های جایزه</span><b id="heroMissionSummary">مشاهده مأموریت‌ها</b><div><i></i><i></i><i></i></div></div>
+          </aside>
+        </div>
+
+        <div class="section-heading">
+          <div><span>سریع و اعتیادآور</span><h2>الان چی بازی کنیم؟</h2></div>
+          <div class="swipe-hint"><svg><use href="#i-arrow-left"/></svg> بکش و انتخاب کن</div>
+        </div>
+
+        <div class="game-carousel" id="gameCarousel" tabindex="0" aria-label="بازی‌های فوری">
+          <article class="game-card hokm-feature-card" data-go="hokm" role="button" tabindex="0">
+            <div class="card-top"><span class="game-number">★</span><span class="online-chip"><i></i> جدید · چهار نفره</span></div>
+            <div class="game-art hokm-art" aria-hidden="true"><span class="hokm-mini-card">♠</span><span class="hokm-mini-card gold">♥</span><b>حکم</b><i>۴ نفره</i></div>
+            <div class="game-info"><span>پاسور ایرانی · تیمی</span><h3>حکم چهارنفره</h3><p>با هوش مصنوعی بازی کن؛ حکم، سرس، نرس و تک‌نرس. تیمت رو ببر!</p></div>
+            <button class="card-play" aria-label="اجرای بازی حکم"><svg><use href="#i-play"/></svg></button>
+          </article>
+          <article class="game-card board-game-card" data-go="boardgames" role="button" tabindex="0">
+            <div class="card-top"><span class="game-number">★</span><span class="online-chip"><i></i> کلاسیک · تاس</span></div>
+            <div class="game-art boardgame-art" aria-hidden="true"><span class="hokm-mini-card">🎲</span><b>منچ</b><i>و مارپله</i></div>
+            <div class="game-info"><span>بازی تخته‌ای · دو نفره</span><h3>منچ و مارپله</h3><p>با رفیق یا ربات بازی کن؛ تاس بنداز و اول برس به خانه!</p></div>
+            <button class="card-play" aria-label="اجرای منچ و مارپله"><svg><use href="#i-play"/></svg></button>
+          </article>
+          <article class="game-card ajorchin-card" data-go="ajorchin" role="button" tabindex="0">
+            <div class="card-top"><span class="game-number">★</span><span class="online-chip"><i></i> جدید · اعتیادآور</span></div>
+            <div class="game-art ajorchin-art" aria-hidden="true"><span>🧱</span><b>آجرچین</b><i>استکینگ</i></div>
+            <div class="game-info"><span>بازی تت‌ریس‌وار · تک‌نفره</span><h3>🧱 آجرچین</h3><p>آجرها رو بچین، خطوط رو پاک کن و رکورد بزن!</p></div>
+            <button class="card-play" aria-label="اجرای آجرچین"><svg><use href="#i-play"/></svg></button>
+          </article>
+          <article class="game-card snake-card" data-go="snake" role="button" tabindex="0">
+            <div class="card-top"><span class="game-number">★</span><span class="online-chip"><i></i> کلاسیک · اعتیادآور</span></div>
+            <div class="game-art snake-art" aria-hidden="true"><span>🐍</span><b>مار غذایی</b><i>کلاسیک</i></div>
+            <div class="game-info"><span>بازی کلاسیک · تک‌نفره</span><h3>🐍 مار غذایی</h3><p>غذا بخور، بزرگ شو، به خودت نخور! رکورد بزن!</p></div>
+            <button class="card-play" aria-label="اجرای مار غذایی"><svg><use href="#i-play"/></svg></button>
+          </article>
+          <article class="game-card purple-card" data-game="reflex" role="button" tabindex="0">
+            <div class="card-top"><span class="game-number">01</span><span class="online-chip"><i></i> ۲.۱K آنلاین</span></div>
+            <div class="game-art reaction-art" aria-hidden="true"><span>۰.۰۰</span><b>⚡</b><i>!</i></div>
+            <div class="game-info"><span>سرعت عمل</span><h3>شکارِ لحظه</h3><p>سبز شد، بزن! نه یه میلی‌ثانیه زودتر.</p></div>
+            <button class="card-play" aria-label="اجرای شکار لحظه"><svg><use href="#i-play"/></svg></button>
+          </article>
+
+          <article class="game-card orange-card" data-game="emoji" role="button" tabindex="0">
+            <div class="card-top"><span class="game-number">02</span><span class="online-chip dark"><i></i> محبوب امروز</span></div>
+            <div class="game-art emoji-art" aria-hidden="true"><span>🐸</span><span>☕</span><b>؟</b></div>
+            <div class="game-info"><span>حدس میم</span><h3>ایموجی‌بازی</h3><p>میم معروف رو فقط از روی سه ایموجی پیدا کن.</p></div>
+            <button class="card-play dark-play" aria-label="اجرای ایموجی بازی"><svg><use href="#i-play"/></svg></button>
+          </article>
+
+          <article class="game-card cyan-card" data-game="cap" role="button" tabindex="0">
+            <div class="card-top"><span class="game-number">03</span><span class="online-chip dark"><i></i> +۱۰۰ XP</span></div>
+            <div class="game-art cap-art" aria-hidden="true"><b>FACT</b><i>or</i><strong>CAP?</strong></div>
+            <div class="game-info dark-copy"><span>واقعی یا الکی</span><h3>فکت یا کپ؟</h3><p>خبر واقعی اینترنت رو از سوتی خنده‌دار جدا کن.</p></div>
+            <button class="card-play dark-play" aria-label="اجرای فکت یا کپ"><svg><use href="#i-play"/></svg></button>
+          </article>
+
+          <article class="game-card pink-card" data-game="memory" role="button" tabindex="0">
+            <div class="card-top"><span class="game-number">04</span><span class="online-chip"><i></i> حافظه‌سنج</span></div>
+            <div class="game-art memory-art" aria-hidden="true"><span>?</span><span>😂</span><span>?</span><span>🐸</span></div>
+            <div class="game-info"><span>جفت‌ها رو پیدا کن</span><h3>حافظه میم</h3><p>کارت‌ها رو برگردون و ۶ جفت ایموجی رو شکار کن.</p></div>
+            <button class="card-play" aria-label="اجرای حافظه میم"><svg><use href="#i-play"/></svg></button>
+          </article>
+
+          <article class="game-card yellow-card" data-game="tap" role="button" tabindex="0">
+            <div class="card-top"><span class="game-number">05</span><span class="online-chip dark"><i></i> رکوردی</span></div>
+            <div class="game-art tap-art" aria-hidden="true"><span>👆</span><b>× 30</b><i>10s</i></div>
+            <div class="game-info dark-copy"><span>سرعت انگشت</span><h3>طوفان ضربه</h3><p>۱۰ ثانیه وقت داری؛ هرچی می‌تونی بزن!</p></div>
+            <button class="card-play dark-play" aria-label="اجرای طوفان ضربه"><svg><use href="#i-play"/></svg></button>
+          </article>
+
+          <article class="game-card dark-card" data-game="reverse" role="button" tabindex="0">
+            <div class="card-top"><span class="game-number">06</span><span class="online-chip"><i></i> چالش مغز</span></div>
+            <div class="game-art reverse-art" aria-hidden="true"><b>MEME</b><i>⇄</i><strong>EMEM</strong></div>
+            <div class="game-info"><span>برعکسش کن</span><h3>تایپ معکوس</h3><p>کلمه‌ای که می‌بینی رو قبل از پایان تایمر برعکس بنویس.</p></div>
+            <button class="card-play" aria-label="اجرای تایپ معکوس"><svg><use href="#i-play"/></svg></button>
+          </article>
+        </div>
+
+        <div class="content-grid">
+          <section class="trend-section" aria-labelledby="trend-title">
+            <div class="section-heading compact"><div><span>از کانال @Ajor_pareh</span><h2 id="trend-title">داغ‌های امروز</h2></div><a href="https://t.me/Ajor_pareh" data-telegram-link>همه پست‌ها <svg><use href="#i-arrow-left"/></svg></a></div>
+            <div class="trend-list" id="channelPostList">
+              <a class="trend-item" href="https://t.me/Ajor_pareh" data-telegram-link>
+                <span class="trend-rank">01</span><div><span class="tag hot">🔥 ترکوند</span><h3>وقتی می‌گی «فقط پنج دقیقه» گوشی چک می‌کنم...</h3><p>۳۲K بازدید · ۸ دقیقه پیش</p></div><span class="trend-emoji">🫠</span>
+              </a>
+              <a class="trend-item" href="https://t.me/Ajor_pareh" data-telegram-link>
+                <span class="trend-rank">02</span><div><span class="tag">میم روز</span><h3>نسخه جدید «من شنبه شروع می‌کنم» رسید!</h3><p>۱۸K بازدید · ۲۶ دقیقه پیش</p></div><span class="trend-emoji">😂</span>
+              </a>
+              <a class="trend-item" href="https://t.me/Ajor_pareh" data-telegram-link>
+                <span class="trend-rank">03</span><div><span class="tag cyan">عجیب ولی واقعی</span><h3>گربه‌ای که رکورد یک بازی موبایلی رو شکست</h3><p>۹.۴K بازدید · ۱ ساعت پیش</p></div><span class="trend-emoji">🐈</span>
+              </a>
+            </div>
+          </section>
+
+          <aside class="week-challenge">
+            <span class="eyebrow">چالش گروهی هفته</span>
+            <h2>تیم رفیقات رو بساز</h2>
+            <p>۴ نفر، ۴ بازی، یک جایزه خیلی خفن. فقط تا جمعه وقت دارین.</p>
+            <div class="team-row"><span>تو</span><span>؟</span><span>؟</span><span>؟</span></div>
+            <button class="btn btn-cyan" data-share="invite"><svg><use href="#i-users"/></svg> دعوت از رفیقا</button>
+            <small>تا الان ۳۸۶ تیم ساخته شده</small>
+          </aside>
+        </div>
+      </section>
+
+      <section class="page" data-page="hokm" aria-labelledby="hokm-title">
+        <div class="hokm-topbar">
+          <button class="icon-button light" data-go="games" aria-label="بازگشت به بازی‌ها"><svg><use href="#i-arrow-right"/></svg></button>
+          <h1 id="hokm-title">🎴 حکم چهارنفره</h1>
+          <span class="hokm-status-chip" id="hokmStatusChip">آفلاین</span>
+        </div>
+        <div id="hokmRoot" class="hokm-root"><p class="hokm-loading">در حال آماده‌سازی میز حکم…</p></div>
+      </section>
+
+      <section class="page" data-page="boardgames" aria-labelledby="boardgames-title">
+        <div class="hokm-topbar">
+          <button class="icon-button light" data-go="games" aria-label="بازگشت به بازی‌ها"><svg><use href="#i-arrow-right"/></svg></button>
+          <h1 id="boardgames-title">🎲 منچ و مارپله</h1>
+          <span class="hokm-status-chip" id="bgStatusChip">آفلاین</span>
+        </div>
+        <div id="boardGamesRoot" class="hokm-root"><p class="hokm-loading">در حال آماده‌سازی میز بازی…</p></div>
+      </section>
+
+      <section class="page" data-page="ajorchin" aria-labelledby="ajorchin-title">
+        <div class="hokm-topbar">
+          <button class="icon-button light" data-go="games" aria-label="بازگشت به بازی‌ها"><svg><use href="#i-arrow-right"/></svg></button>
+          <h1 id="ajorchin-title">🧱 آجرچین</h1>
+          <span class="hokm-status-chip" id="ajorchinStatusChip">آفلاین</span>
+        </div>
+        <div id="pageBoardgames"><p class="hokm-loading">در حال آماده‌سازی آجرچین…</p></div>
+      </section>
+
+      <section class="page" data-page="snake" aria-labelledby="snake-title">
+        <div class="hokm-topbar">
+          <button class="icon-button light" data-go="games" aria-label="بازگشت به بازی‌ها"><svg><use href="#i-arrow-right"/></svg></button>
+          <h1 id="snake-title">🐍 مار غذایی</h1>
+          <span class="hokm-status-chip" id="snakeStatusChip">آفلاین</span>
+        </div>
+        <div id="pageSnake"><p class="hokm-loading">در حال آماده‌سازی مار غذایی…</p></div>
+      </section>
+
+      <section class="page" data-page="calendar" aria-labelledby="calendar-title">
+        <div class="cal-header">
+          <span class="section-kicker"><span></span> تقویم جلالی · شمسی</span>
+          <h1 id="calendar-title">تقویم ایرانی</h1>
+          <p>امروز و مناسبت‌های هر روز را ببین؛ ماه را عوض کن.</p>
+        </div>
+        <div class="cal-today-card" id="calTodayCard">
+          <div class="cal-today-date"><span id="calTodayDay">—</span><b id="calTodayMonthYear">—</b></div>
+          <div class="cal-today-info">
+            <p id="calTodayGregorian">—</p>
+            <p id="calTodayIslamic">—</p>
+            <div id="calTodayOccasions" class="cal-today-occasions"></div>
+          </div>
+        </div>
+        <div class="cal-controls">
+          <button class="icon-button light" id="calPrevBtn" aria-label="ماه قبل"><svg><use href="#i-arrow-right"/></svg></button>
+          <h2 id="calMonthTitle">—</h2>
+          <button class="icon-button light" id="calNextBtn" aria-label="ماه بعد"><svg><use href="#i-arrow-left"/></svg></button>
+        </div>
+        <div class="cal-weekdays"><span>ش</span><span>ی</span><span>د</span><span>س</span><span>چ</span><span>پ</span><span>ج</span></div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-legend"><span><i class="today-dot"></i> امروز</span><span><i class="occ-dot"></i> مناسبت</span></div>
+        <div class="cal-occasions-panel" id="calOccasionsPanel"></div>
+      </section>
+
+      <section class="page" data-page="challenges" aria-labelledby="challenges-title">
+        <div class="page-title-row">
+          <div><span class="section-kicker"><span></span> جرأت داری؟</span><h1 id="challenges-title">چالش‌های وایرال</h1><p>بازی کن، مدرک جمع کن و رفیقات رو تگ کن.</p></div>
+          <div class="streak-box"><svg><use href="#i-fire"/></svg><span><b>۷ روز</b><small>استریک فعلی</small></span></div>
+        </div>
+        <div class="filter-row" role="group" aria-label="فیلتر چالش‌ها">
+          <button class="filter-button active" data-filter="all">همه</button><button class="filter-button" data-filter="daily">روزانه</button><button class="filter-button" data-filter="friends">با رفیقا</button><button class="filter-button" data-filter="quick">زیر ۱ دقیقه</button>
+        </div>
+        <div class="challenge-grid">
+          <article class="challenge-card featured-challenge" data-category="daily quick">
+            <div class="challenge-visual face-visual"><span>😐</span><i>→</i><span>🤣</span><b>نخند!</b></div>
+            <div class="challenge-body"><div class="challenge-meta"><span class="tag hot">داغ‌ترین</span><span><svg><use href="#i-users"/></svg> ۱۲.۴K</span></div><h2>۳۰ ثانیه نخند</h2><p>سه میم، سی ثانیه و یک صورت کاملاً جدی. آسونه؟ ثابت کن.</p><div class="reward-line"><span>جایزه</span><b>+۲۵۰ XP</b></div><button class="btn btn-accent join-challenge" data-game="laugh">بزن بریم <svg><use href="#i-arrow-left"/></svg></button></div>
+          </article>
+          <article class="challenge-card" data-category="friends">
+            <div class="challenge-visual voice-visual"><span>🎤</span><b>۳×</b></div>
+            <div class="challenge-body"><div class="challenge-meta"><span class="tag purple">با رفیقا</span><span><svg><use href="#i-clock"/></svg> ۲ روز</span></div><h2>ویس بدون «اِممم»</h2><p>۶۰ ثانیه حرف بزن؛ هر «اِمم» یک امتیاز برای رفیقت.</p><div class="reward-line"><span>جایزه</span><b>+۱۸۰ XP</b></div><button class="btn btn-outline join-challenge">شرکت می‌کنم</button></div>
+          </article>
+          <article class="challenge-card" data-category="quick daily">
+            <div class="challenge-visual scroll-visual"><span>👆</span><b>STOP</b></div>
+            <div class="challenge-body"><div class="challenge-meta"><span class="tag cyan">۴۵ ثانیه</span><span><svg><use href="#i-users"/></svg> ۶.۸K</span></div><h2>اسکرول ممنوع!</h2><p>می‌تونی ۴۵ ثانیه بدون اسکرول کردن دووم بیاری؟</p><div class="reward-line"><span>جایزه</span><b>+۱۲۰ XP</b></div><button class="btn btn-outline join-challenge">شرکت می‌کنم</button></div>
+          </article>
+          <article class="challenge-card" data-category="friends quick">
+            <div class="challenge-visual pose-visual"><span>🤳</span><i>✨</i></div>
+            <div class="challenge-body"><div class="challenge-meta"><span class="tag">میم‌ساز</span><span><svg><use href="#i-clock"/></svg> ۸ ساعت</span></div><h2>بدترین ژست ممکن</h2><p>عجیب‌ترین سلفی رو بگیر و رأی جمع کن. خجالت نکش!</p><div class="reward-line"><span>جایزه</span><b>بج ویژه</b></div><button class="btn btn-outline join-challenge">شرکت می‌کنم</button></div>
+          </article>
+          <article class="challenge-card" data-category="daily quick">
+            <div class="challenge-visual memory-visual"><span>🧠</span><b>6 PAIRS</b></div>
+            <div class="challenge-body"><div class="challenge-meta"><span class="tag purple">جدید</span><span><svg><use href="#i-clock"/></svg> ۱ دقیقه</span></div><h2>حافظه میم</h2><p>همه جفت‌ها رو با کمتر از ۱۸ حرکت پیدا کن.</p><div class="reward-line"><span>جایزه</span><b>+۱۴۰ XP</b></div><button class="btn btn-outline join-challenge" data-game="memory">شروع چالش</button></div>
+          </article>
+          <article class="challenge-card" data-category="daily quick">
+            <div class="challenge-visual tap-visual"><span>👆</span><b>10 SEC</b></div>
+            <div class="challenge-body"><div class="challenge-meta"><span class="tag hot">رکوردی</span><span><svg><use href="#i-users"/></svg> ۳.۲K</span></div><h2>طوفان ضربه</h2><p>در ۱۰ ثانیه بیشتر از ۴۰ ضربه ثبت کن.</p><div class="reward-line"><span>جایزه</span><b>+۱۲۰ XP</b></div><button class="btn btn-outline join-challenge" data-game="tap">شروع چالش</button></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" data-page="news" aria-labelledby="news-title">
+        <div class="news-hero">
+          <div>
+            <span class="section-kicker"><span></span> تازه، کوتاه، خواندنی</span>
+            <h1 id="news-title">نبضِ امروز</h1>
+            <p>خبرهای تازه ایران، جهان و تکنولوژی؛ مستقیم از RSS منابع و بدون شلوغ‌کاری.</p>
+            <div class="news-live-line"><i></i><span id="newsUpdated">در حال دریافت تازه‌ترین خبرها...</span></div>
+          </div>
+          <div class="news-hero-art" aria-hidden="true"><span>🗞</span><b>LIVE</b><i>⚡</i></div>
+        </div>
+
+        <div class="news-toolbar">
+          <div class="news-filters" role="group" aria-label="فیلتر خبرها">
+            <button class="active" data-news-filter="all">همه</button>
+            <button data-news-filter="iran">ایران</button>
+            <button data-news-filter="world">جهان</button>
+            <button data-news-filter="tech">تکنولوژی</button>
+          </div>
+          <button class="news-refresh" id="newsRefresh" type="button"><svg><use href="#i-refresh"/></svg> بروزرسانی</button>
+        </div>
+
+        <div class="news-layout">
+          <section>
+            <div class="news-grid" id="newsGrid" aria-live="polite">
+              <article class="news-skeleton"><i></i><span></span><b></b><p></p></article>
+              <article class="news-skeleton"><i></i><span></span><b></b><p></p></article>
+              <article class="news-skeleton"><i></i><span></span><b></b><p></p></article>
+              <article class="news-skeleton"><i></i><span></span><b></b><p></p></article>
+            </div>
+            <div class="news-empty" id="newsEmpty" hidden><span>📡</span><b>فعلاً خبرها نرسیدن</b><p>چند لحظه دیگه دوباره بروزرسانی کن.</p></div>
+          </section>
+
+          <aside class="joke-station">
+            <div class="joke-head"><span>😂</span><div><small>حال‌خوب‌کن روز</small><h2>جوک‌دونی</h2></div></div>
+            <blockquote id="jokeText">یه جوک تازه توی راهه...</blockquote>
+            <div class="joke-reactions"><button data-joke-reaction="😂">😂 <span>۱۲۸</span></button><button data-joke-reaction="😐">😐 <span>۱۷</span></button></div>
+            <button class="btn btn-accent" id="newJoke" type="button"><svg><use href="#i-refresh"/></svg> یکی دیگه بگو</button>
+            <small class="joke-note">هر بار یه جوک تصادفی؛ برای رفیقات هم بفرست!</small>
+            <button class="share-joke" id="shareJoke" type="button"><svg><use href="#i-share"/></svg> اشتراک جوک</button>
+          </aside>
+        </div>
+        <p class="news-disclaimer">منبع هر خبر روی کارت مشخص است. Ajorpareh فقط عنوان و خلاصه RSS عمومی منابع را نمایش می‌دهد.</p>
+      </section>
+
+      <section class="page" data-page="media" aria-labelledby="media-title">
+        <div class="media-hero">
+          <div><span class="section-kicker"><span></span> فایل و ویدئو بدون خروج از تلگرام</span><h1 id="media-title">مرکز رسانه و لینک</h1><p>دانلود محتوای عمومی شبکه‌های اجتماعی، آپلود فایل مستقیم از URL و بررسی ساختار لینک‌های مشکوک.</p></div>
+          <div class="media-cloud" aria-hidden="true"><span>⬇</span><b>URL</b></div>
+        </div>
+        <div class="media-tools-grid">
+          <section class="media-tool-card">
+            <span class="eyebrow">Instagram · TikTok · YouTube · X · Facebook</span><h2>دانلود حرفه‌ای شبکه‌ها</h2>
+            <p>لینک عمومی پست، Reel یا ویدئو را بفرست؛ ده‌ها پلتفرم + هر سایت با ویدئو پشتیبانی می‌شود. ویدئوهای بزرگ خودکار فشرده می‌شوند و گزینه استخراج صوت MP3 هم داری.</p>
+            <form id="socialDownloadForm"><input id="socialDownloadUrl" type="url" required placeholder="https://instagram.com/reel/..." /><button class="btn btn-cyan" type="submit">ثبت دانلود</button></form>
+            <small>محتوای خصوصی، نیازمند ورود یا DRM پشتیبانی نمی‌شود.</small>
+          </section>
+          <section class="media-tool-card instagram-comment-card">
+            <span class="eyebrow">Instagram · Public Comment</span><h2>💬 کپی متن کامنت</h2>
+            <p>لینک مستقیم همان کامنت را بفرست تا متن کامنت عمومی را برای کپی‌کردن برگردانم.</p>
+            <form id="instagramCommentForm"><input id="instagramCommentUrl" type="url" required placeholder="https://instagram.com/reel/.../?comment_id=..." /><button class="btn btn-outline" type="submit">استخراج متن</button></form>
+            <div id="instagramCommentResult" class="link-inspection-result" hidden></div>
+          </section>
+          <section class="media-tool-card">
+            <span class="eyebrow">Direct File Uploader</span><h2>آپلود فایل از URL</h2>
+            <p>لینک مستقیم HTTPS فیلم، عکس، صوت، PDF یا ZIP را بده تا فایل داخل تلگرام برایت ارسال شود.</p>
+            <form id="urlUploadForm"><input id="urlUploadInput" type="url" required placeholder="https://example.com/movie.mp4" /><button class="btn btn-accent" type="submit">آپلود به تلگرام</button></form>
+            <small>صفحه سایت قبول نیست؛ لینک باید مستقیم باشد. تقریباً هر فرمتی (APK، EXE، PDF، ZIP، Office و…) تا ۲ گیگابایت پشتیبانی می‌شود.</small>
+          </section>
+          <section class="media-tool-card link-inspector-card">
+            <span class="eyebrow">Anti-Phishing Check</span><h2>بررسی امنیت لینک</h2>
+            <p>HTTPS، دامنه کوتاه‌شده، Punycode، IP مستقیم و واژه‌های حساس لینک بررسی می‌شوند.</p>
+            <form id="linkInspectForm"><input id="linkInspectUrl" type="url" required placeholder="https://example.com/path" /><button class="btn btn-outline" type="submit">بررسی لینک</button></form>
+            <div id="linkInspectionResult" class="link-inspection-result" hidden></div>
+          </section>
+          <section class="media-tool-card music-card" role="button" tabindex="0" data-go="music">
+            <span class="eyebrow">🎵 Music Center · جستجو · ترند · تشخیص</span><h2>🎧 بخش موسیقی</h2>
+            <p>جستجوی آهنگ با اسم خواننده، آهنگ‌های ترند، گوش دادن آنلاین و تشخیص آهنگ با تکه صدا — همه در یک بخش.</p>
+            <div class="music-actions"><button class="btn btn-accent" type="button" data-go="music">🎵 ورود به بخش موسیقی</button></div>
+          </section>
+        </div>
+        <p class="media-legal-note">⚠️ فقط محتوای عمومی و فایل‌هایی را دریافت کن که مالک آن هستی یا اجازه ذخیره‌شان را داری. رمز، کوکی یا اطلاعات ورود هیچ سایتی را برای ربات نفرست.</p>
+      </section>
+
+      <section class="page" data-page="music" aria-labelledby="music-title">
+        <div class="hokm-topbar">
+          <button class="icon-button light" data-go="media" aria-label="بازگشت به رسانه"><svg><use href="#i-arrow-right"/></svg></button>
+          <h1 id="music-title">🎧 موسیقی</h1>
+          <span class="hokm-status-chip" id="musicStatusChip">آماده</span>
+        </div>
+        <div class="music-tabs">
+          <button class="music-tab active" data-mtab="search">🔎 جستجو</button>
+          <button class="music-tab" data-mtab="trending">🔥 ترند</button>
+          <button class="music-tab" data-mtab="listen">🎧 گوش دادن</button>
+        </div>
+        <div class="music-quick-actions" aria-label="ابزارهای موسیقی ایرانی">
+          <button class="btn btn-outline btn-mini" id="musicIranianTrendBtn" type="button">🇮🇷 ترند ایرانی</button>
+          <button class="btn btn-outline btn-mini" id="musicIranianRemixBtn" type="button">🎚 ریمیکس ایرانی</button>
+          <button class="btn btn-accent btn-mini" type="button" data-open-bot="iran_playlist">📚 پلی‌لیست عمومی</button>
+          <button class="btn btn-outline btn-mini" type="button" data-open-bot="daily_music">📅 موزیک امروز</button>
+        </div>
+        <div id="musicTabSearch" class="music-tab-panel">
+          <div class="media-tool-card">
+            <h2>جستجوی آهنگ</h2>
+            <p>نام آهنگ یا خواننده را بنویس (فارسی/انگلیسی).</p>
+            <form id="musicSearchForm"><input id="musicSearchInput" type="text" required minlength="2" maxlength="120" placeholder="نام آهنگ یا خواننده..." /><button class="btn btn-cyan" type="submit">جستجو</button></form>
+            <div id="musicResults" class="music-results"><p>اسم آهنگ را بنویس.</p></div>
+          </div>
+        </div>
+        <div id="musicTabTrending" class="music-tab-panel" hidden>
+          <div class="media-tool-card">
+            <h2>🔥 آهنگ‌های ترند</h2>
+            <p>ترند جهانی یا ایرانی را انتخاب کن؛ پاپ، رپ، سنتی و ریمیکس هم پوشش داده می‌شود.</p>
+            <button class="btn btn-outline" id="musicTrendingBtn2" type="button">🔥 نمایش ترندها</button>
+            <div id="musicTrendingResults" class="music-results"><p>دکمه را بزن تا ترندها بیاید.</p></div>
+          </div>
+        </div>
+        <div id="musicTabListen" class="music-tab-panel" hidden>
+          <div class="media-tool-card">
+            <h2>🎧 گوش دادن آنلاین</h2>
+            <p>ترندها را همین‌جا پخش کن؛ دانلود در ربات هم دارد.</p>
+            <button class="btn btn-accent" id="musicListenBtn2" type="button">🎧 پخش آنلاین ترندها</button>
+            <div id="musicListenResults" class="music-results"><p>دکمه را بزن.</p></div>
+          </div>
+        </div>
+        <p class="music-recognize-note">🎤 <b>تشخیص آهنگ:</b> برای شناسایی با تکه صدا، به ربات برو ← <code>/song</code> ← «🎤 تشخیص آهنگ»</p>
+      </section>
+
+      <section class="page" data-page="rewards" aria-labelledby="rewards-title">
+        <div class="rewards-hero">
+          <div><span class="section-kicker"><span></span> سکه بگیر، جایزه ببر</span><h1 id="rewards-title">باشگاه جوایز</h1><p>گردونه شانس، فروشگاه مدال‌ها، قرعه‌کشی و پیش‌بینی ترندها.</p></div>
+          <div class="coin-balance"><span>🪙 موجودی سکه</span><b id="clubCoins">۰</b><small id="economyMultiplier">ضریب اقتصاد: ۱×</small></div>
+        </div>
+        <div class="rewards-grid">
+          <section class="wheel-card"><span class="eyebrow">هر روز یک چرخش رایگان</span><h2>گردونه شانس</h2><div class="wheel-disc" id="wheelDisc"><span>🎁</span><i>🪙</i><b>⚡</b></div><p id="spinHint">اولین چرخش امروز رایگانه.</p><button class="btn btn-accent" id="spinButton">بچرخون!</button></section>
+          <section class="club-panel"><div class="section-heading compact"><div><span>آیتم‌های مجازی</span><h2>فروشگاه</h2></div></div><div class="shop-grid" id="shopGrid"><p>در حال دریافت آیتم‌ها...</p></div></section>
+        </div>
+        <div class="club-lower-grid">
+          <section class="club-panel gift-code-panel"><div class="section-heading compact"><div><span>هدیه مدیر و کمپین‌ها</span><h2>فعال‌سازی کد هدیه</h2></div><span>🎟</span></div><form id="miniGiftForm"><input id="miniGiftCode" maxlength="20" autocomplete="off" placeholder="مثلاً AJOR100" required /><button type="submit">دریافت هدیه</button></form><p id="miniGiftHint">کد می‌تونه شامل سکه، XP، سهمیه AI، نشان، استیکر یا گیف باشه.</p></section>
+          <section class="club-panel mission-club"><div class="section-heading compact"><div><span>کار واقعی، جایزه واقعی</span><h2>مأموریت‌های جایزه</h2></div><button class="news-refresh" id="missionRefresh" type="button"><svg><use href="#i-refresh"/></svg> بروزرسانی</button></div><div id="missionList" class="mission-list"><p>در حال محاسبه مأموریت‌ها...</p></div></section>
+          <section class="club-panel"><div class="section-heading compact"><div><span>با سکه شرکت کن</span><h2>قرعه‌کشی‌ها</h2></div></div><div id="raffleList" class="club-list"><p>فعلاً در حال بررسی...</p></div></section>
+          <section class="club-panel"><div class="section-heading compact"><div><span>ترند بعدی رو حدس بزن</span><h2>پیش‌بینی‌ها</h2></div></div><div id="predictionList" class="club-list"><p>در حال بارگذاری...</p></div></section>
+          <section class="club-panel leaderboard-live"><div class="section-heading compact"><div><span>مسابقه تازه</span><h2>برترین‌های دوره</h2></div><div class="period-tabs"><button class="active" data-live-board="weekly">هفته</button><button data-live-board="monthly">ماه</button></div></div><div id="liveLeaderboard" class="live-leaderboard"><p>در حال محاسبه...</p></div></section>
+        </div>
+      </section>
+
+      <section class="page" data-page="leaderboard" aria-labelledby="leaderboard-title">
+        <div class="page-title-row leaderboard-title-row">
+          <div><span class="section-kicker"><span></span> تالار خفن‌ها</span><h1 id="leaderboard-title">جدول رکوردها</h1><p>هر رکوردی بالاخره شکسته می‌شه. شاید امروز دست تو!</p></div>
+          <button class="icon-label-button" data-share="rank"><svg><use href="#i-share"/></svg><span>اشتراک رتبه</span></button>
+        </div>
+        <div class="leader-tabs segmented-control" role="tablist">
+          <button class="active" data-board="all">همه‌زمان</button><button data-board="monthly">این ماه</button><button data-board="weekly">این هفته</button>
+        </div>
+        <div class="podium" id="podium">
+          <div class="podium-player second"><div class="podium-avatar">ن<span>2</span></div><h3>نیما.exe</h3><p>۸,۸۴۰ XP</p><i></i></div>
+          <div class="podium-player first"><div class="crown">♛</div><div class="podium-avatar">س<span>1</span></div><h3>سارا_میم</h3><p>۹,۶۲۰ XP</p><i></i></div>
+          <div class="podium-player third"><div class="podium-avatar">ک<span>3</span></div><h3>کپ‌نشدنی</h3><p>۸,۱۱۰ XP</p><i></i></div>
+        </div>
+        <div class="rank-list" id="rankList">
+          <div class="your-rank"><span>رتبه تو</span><b id="boardMyRank">#—</b><p>با بازی و چالش رتبه‌ات رو بالا ببر</p><strong id="boardMyPoints">۰ XP</strong></div>
+          <article><span class="rank-num">04</span><span class="rank-avatar orange-avatar">ا</span><div><b>امیرِ همیشه آنلاین</b><small>برد ۹۱٪</small></div><strong>۷,۹۸۰</strong><span class="rank-change up">↑ ۲</span></article>
+          <article><span class="rank-num">05</span><span class="rank-avatar cyan-avatar">پ</span><div><b>پاستیل_بنفش</b><small>استریک ۱۸ روز</small></div><strong>۷,۶۴۰</strong><span class="rank-change">—</span></article>
+          <article><span class="rank-num">06</span><span class="rank-avatar yellow-avatar">م</span><div><b>من_نبودم</b><small>برد ۸۸٪</small></div><strong>۷,۳۱۰</strong><span class="rank-change down">↓ ۱</span></article>
+          <article><span class="rank-num">07</span><span class="rank-avatar purple-avatar">خ</span><div><b>خوابالو۹۹</b><small>۱۲ بج</small></div><strong>۶,۹۵۰</strong><span class="rank-change up">↑ ۴</span></article>
+          <article><span class="rank-num">08</span><span class="rank-avatar pink-avatar">ر</span><div><b>ری‌اکشن‌باز</b><small>استریک ۹ روز</small></div><strong>۶,۸۲۰</strong><span class="rank-change up">↑ ۱</span></article>
+        </div>
+      </section>
+
+      <section class="page" data-page="ai" aria-labelledby="ai-title">
+        <div class="ai-hero">
+          <div>
+            <span class="section-kicker"><span></span> دستیار روزمره، همیشه آماده</span>
+            <h1 id="ai-title">هوش مصنوعی Ajorpareh</h1>
+            <p>چت، ترجمه، خلاصه، برنامه‌نویسی، تولید محتوا و ساخت تصویر؛ با جابه‌جایی خودکار بین Gemini، Groq و OpenRouter.</p>
+            <div class="ai-provider-line" id="aiProviderLine"><i></i><span>در حال بررسی سرویس‌ها...</span></div>
+          </div>
+          <div class="ai-hero-orb" aria-hidden="true"><span>AI</span><i></i><b></b></div>
+        </div>
+
+        <div class="ai-dashboard">
+          <section class="ai-workspace">
+            <div class="section-heading compact"><div><span>یک کار انتخاب کن</span><h2>دستیار هوشمند</h2></div><strong id="aiTextQuota">—</strong></div>
+            <div class="ai-mode-grid" role="group" aria-label="نوع درخواست هوش مصنوعی">
+              <button class="active" data-ai-mode="chat">💬 چت</button>
+              <button data-ai-mode="rewrite">✍️ بازنویسی</button>
+              <button data-ai-mode="translate">🌐 ترجمه</button>
+              <button data-ai-mode="summary">🧠 خلاصه</button>
+              <button data-ai-mode="study">📚 کمک درسی</button>
+              <button data-ai-mode="code">💻 کدنویسی</button>
+              <button data-ai-mode="content">📣 محتوا</button>
+              <button data-ai-mode="ideas">💡 ایده</button>
+            </div>
+            <form id="aiTextForm" class="ai-form">
+              <label for="aiPrompt">درخواستت<textarea id="aiPrompt" minlength="2" maxlength="6000" required placeholder="مثلاً این متن را خلاصه و نکات مهمش را جدا کن..."></textarea></label>
+              <div class="ai-form-actions">
+                <button class="btn btn-cyan" id="aiSubmit" type="submit">ارسال به هوش مصنوعی <svg><use href="#i-send"/></svg></button>
+                <button class="btn btn-outline" id="aiClear" type="button">پاک‌کردن گفتگو</button>
+              </div>
+            </form>
+            <div class="ai-output" id="aiOutput" aria-live="polite" hidden><div><b>پاسخ</b><button id="aiCopy" type="button">📋 کپی</button></div><pre id="aiOutputText"></pre><small id="aiOutputMeta"></small></div>
+          </section>
+
+          <aside class="ai-image-panel">
+            <span class="eyebrow">تصویرسازی رایگان با fallback</span>
+            <h2>ایده‌ات رو تصویر کن</h2>
+            <p>سوژه، سبک، رنگ و نور را توصیف کن. اگر Gemini سهمیه نداشت، Flux خودکار ادامه می‌دهد.</p>
+            <label for="aiImagePrompt">توضیح تصویر<textarea id="aiImagePrompt" minlength="3" maxlength="1200" placeholder="یک شهر آینده‌نگر نئونی در شب، سبک سینمایی..."></textarea></label>
+            <button class="btn btn-accent" id="aiImageButton" type="button">🎨 ساخت تصویر</button>
+            <small id="aiImageQuota">—</small>
+            <div class="ai-image-result" id="aiImageResult" hidden><img id="aiGeneratedImage" alt="تصویر ساخته‌شده با هوش مصنوعی" /><a id="aiImageDownload" download="ajorpareh-ai.jpg">دریافت تصویر</a></div>
+          </aside>
+        </div>
+
+        <section class="reminder-center">
+          <div class="section-heading compact"><div><span>بهره‌وری داخل تلگرام</span><h2>یادآور شخصی</h2></div><svg class="big-help"><use href="#i-bell"/></svg></div>
+          <div class="reminder-layout">
+            <form id="reminderForm" class="reminder-form">
+              <label>متن یادآوری<input id="reminderText" maxlength="500" required placeholder="مثلاً تماس با علی" /></label>
+              <label>زمان به وقت تهران<input id="reminderTime" type="datetime-local" required /></label>
+              <button class="btn btn-cyan" type="submit">ثبت یادآور</button>
+            </form>
+            <div class="reminder-list" id="reminderList"><p>در حال دریافت یادآورها...</p></div>
+          </div>
+        </section>
+        <p class="ai-privacy-note"><svg><use href="#i-shield"/></svg> رمز، کد ورود، اطلاعات بانکی و متن محرمانه برای هوش مصنوعی نفرست.</p>
+      </section>
+
+      <section class="page" data-page="support" aria-labelledby="support-title">
+        <div class="support-hero">
+          <div><span class="section-kicker"><span></span> گیر کردی؟ ما هستیم</span><h1 id="support-title">مرکز کمک و پشتیبانی</h1><p>جواب سریع، آدم واقعی، بدون پیچوندن. اول از سؤال‌های پرتکرار شروع کن یا مستقیم پیام بده.</p><div class="support-actions"><a class="btn btn-accent" href="https://t.me/Ajorparehbot?start=support" data-telegram-link><svg><use href="#i-message"/></svg> گفت‌وگو با پشتیبانی</a><button class="btn btn-outline" data-scroll-form><svg><use href="#i-bug"/></svg> گزارش مشکل</button></div><div class="response-note"><i></i> میانگین زمان پاسخ‌گویی: کمتر از ۱۰ دقیقه</div></div>
+          <div class="support-mascot-wrap"><span>کمکت می‌کنم!</span><img src="assets/ajor-mascot.png" alt="ماسکات پشتیبانی آجُرپاره" /></div>
+        </div>
+        <div class="support-grid">
+          <section class="faq-section">
+            <div class="section-heading compact"><div><span>جواب‌های فوری</span><h2>سؤال‌های پرتکرار</h2></div><svg class="big-help"><use href="#i-help"/></svg></div>
+            <div class="faq-list">
+              <article class="faq-item open"><button aria-expanded="true"><span>امتیاز بازی من ثبت نشده؛ چیکار کنم؟</span><svg><use href="#i-chevron"/></svg></button><div class="faq-answer"><p>اول یک‌بار صفحه را ببند و دوباره از داخل ربات باز کن. اگر امتیاز برنگشت، از فرم گزارش مشکل اسکرین‌شات و زمان تقریبی بازی را بفرست؛ تیم ما بررسی می‌کند.</p></div></article>
+              <article class="faq-item"><button aria-expanded="false"><span>قانون چالش‌ها کجا نوشته شده؟</span><svg><use href="#i-chevron"/></svg></button><div class="faq-answer"><p>روی هر کارت چالش بزن؛ قوانین، زمان و جایزه همان‌جا نمایش داده می‌شود. بعضی چالش‌های گروهی نیاز به دعوت حداقل دو دوست دارند.</p></div></article>
+              <article class="faq-item"><button aria-expanded="false"><span>چطور استریک روزانه‌ام حفظ می‌شود؟</span><svg><use href="#i-chevron"/></svg></button><div class="faq-answer"><p>هر روز تا ساعت ۲۳:۵۹ حداقل یک بازی یا چالش کامل کن. نتیجه برد یا باخت مهم نیست؛ حضور تو مهمه!</p></div></article>
+              <article class="faq-item"><button aria-expanded="false"><span>جوایز و بج‌ها چه کاربردی دارند؟</span><svg><use href="#i-chevron"/></svg></button><div class="faq-answer"><p>XP رتبه و لِول تو را بالا می‌برد؛ بج‌ها هم افتخارهای پروفایلت هستند. در کمپین‌های ویژه، بعضی بج‌ها قفل بازی یا جایزه‌های تازه را باز می‌کنند.</p></div></article>
+              <article class="faq-item"><button aria-expanded="false"><span>چطور حسابم را امن نگه دارم؟</span><svg><use href="#i-chevron"/></svg></button><div class="faq-answer"><p>فقط از ربات رسمی <b dir="ltr">@Ajorparehbot</b> وارد شو و کد ورود تلگرام را برای هیچ‌کس نفرست. پشتیبانی ما هیچ‌وقت رمز یا کد تأیید نمی‌خواهد.</p></div></article>
+            </div>
+          </section>
+
+          <aside class="feedback-card" id="feedbackForm">
+            <div class="feedback-icon"><svg><use href="#i-send"/></svg></div>
+            <span class="eyebrow">صدات شنیده می‌شه</span><h2>ایده یا باگ داری؟</h2><p>خیلی کوتاه بگو چی شده؛ نتیجه پیگیری از طریق ربات برات میاد.</p>
+            <form id="ticketForm">
+              <label>موضوع<select id="ticketType" required><option value="bug">یه چیزی درست کار نمی‌کنه</option><option value="score">مشکل امتیاز یا رکورد</option><option value="idea">پیشنهاد بازی یا چالش</option><option value="other">موضوع دیگه</option></select></label>
+              <label>توضیحات<textarea id="ticketText" required minlength="8" maxlength="500" placeholder="مثلاً: بعد از بازی شکار لحظه، امتیازم ثبت نشد..."></textarea><small><span id="charCount">۰</span>/۵۰۰</small></label>
+              <button type="submit" class="btn btn-cyan">ارسال به پشتیبانی <svg><use href="#i-send"/></svg></button>
+              <div class="privacy-line"><svg><use href="#i-lock"/></svg> اطلاعاتت فقط برای پیگیری همین پیام استفاده می‌شه.</div>
+            </form>
+          </aside>
+        </div>
+        <section class="reviews-section" aria-labelledby="reviews-title">
+          <div class="section-heading compact"><div><span>بازخورد و تجربه</span><h2 id="reviews-title">نظرات کاربران</h2></div><span class="demo-label">نمونه‌های نمایشی مشخص شده‌اند</span></div>
+          <div class="reviews-grid" id="reviewsGrid" aria-live="polite"><p>در حال دریافت نظرها...</p></div>
+          <form class="review-form" id="reviewForm">
+            <div><label>امتیاز<select id="reviewRating"><option value="5">۵ ستاره</option><option value="4">۴ ستاره</option><option value="3">۳ ستاره</option><option value="2">۲ ستاره</option><option value="1">۱ ستاره</option></select></label></div>
+            <label>نظر شما<textarea id="reviewText" minlength="5" maxlength="500" required placeholder="کدوم بخش Mini App رو بیشتر دوست داشتی؟"></textarea></label>
+            <button class="btn btn-cyan" type="submit">ثبت نظر برای بررسی</button>
+            <small>نظرهای واقعی بعد از بررسی منتشر می‌شوند. کارت‌های دارای برچسب «نمونه نمایشی» نظر واقعی نیستند.</small>
+          </form>
+        </section>
+        <div class="official-banner"><div><img src="assets/ajor-mascot.png" alt="" /><span><b>فقط از مسیرهای رسمی با ما در ارتباط باش</b><small>کانال <strong dir="ltr">@Ajor_pareh</strong> · ربات <strong dir="ltr">@Ajorparehbot</strong></small></span></div><svg><use href="#i-shield"/></svg></div>
+      </section>
+
+      <section class="page" data-page="profile" aria-labelledby="profile-title">
+        <div class="profile-hero">
+          <button class="edit-profile" aria-label="ویرایش پروفایل"><svg><use href="#i-edit"/></svg></button>
+          <div class="profile-avatar" id="profileAvatarWrap"><img id="profileAvatarImage" src="assets/ajor-mascot.png" alt="تصویر پروفایل" /><span id="profileLevel">LV.1</span></div>
+          <div class="profile-name"><span>پروفایل بازیکن</span><h1 id="profile-title">در حال دریافت نام تلگرام...</h1><p id="profileUsername" dir="ltr">@telegram_player</p><small id="profileBio">میم‌باز رسمی Ajorpareh ⚡</small></div>
+          <div class="profile-xp"><span><b id="profilePoints">۰</b> امتیاز</span><div><i></i></div><small id="profilePointsNote">امتیاز واقعی بازی و رفرال</small></div>
+        </div>
+        <div class="profile-stat-row"><div><b id="profileGames">۰</b><span>بازی</span></div><div><b id="profileWinRate">۰٪</b><span>نرخ برد</span></div><div><b id="profileStreak">۰</b><span>استریک</span></div><div><b id="profileRank">#—</b><span>رتبه</span></div></div>
+
+        <section class="wallet-center" id="walletCenter">
+          <div class="wallet-heading"><div><span>پاداش، تبدیل و برداشت</span><h2>کیف پول Ajorpareh</h2></div><button id="walletRefresh" type="button"><svg><use href="#i-refresh"/></svg></button></div>
+          <div class="wallet-balances">
+            <article><span>⚡ امتیاز قابل تبدیل</span><b id="walletPoints">۰</b><small>POINTS</small></article>
+            <article><span>🪙 سکه بازی</span><b id="walletCoins">۰</b><small>برای گردونه و خرید</small></article>
+            <article><span>💵 موجودی کیف پول</span><b id="walletToman">۰</b><small>تومان</small></article>
+            <article><span>🎁 رفرال موفق</span><b id="walletReferrals">۰</b><small>هر عضو ۱۰۰ امتیاز</small></article>
+          </div>
+          <div class="wallet-grid">
+            <div class="wallet-box convert-box">
+              <span class="eyebrow">تبدیل امتیاز</span><h3>امتیازت رو نقد کن</h3>
+              <p id="conversionInfo">حداقل ۱۰۰۰ امتیاز؛ هر امتیاز ۱۰۰ تومان.</p>
+              <label>تعداد امتیاز<input id="convertPoints" inputmode="numeric" type="number" min="1000" step="100" value="1000" /></label>
+              <div class="conversion-preview">مبلغ دریافتی: <b id="conversionPreview">۱۰۰٬۰۰۰ تومان</b></div>
+              <button class="btn btn-accent" id="convertPointsButton" type="button">تبدیل به کیف پول</button>
+            </div>
+            <div class="wallet-box referral-box">
+              <span class="eyebrow">دعوت و درآمد</span><h3>رفیق بیار، امتیاز بگیر</h3>
+              <p>هر کاربر جدید بعد از تکمیل عضویت اجباری، ۱۰۰ امتیاز واقعی برایت می‌سازد.</p>
+              <div class="referral-link" id="referralLink" dir="ltr">https://t.me/Ajorparehbot</div>
+              <div class="referral-actions"><button id="copyReferral" type="button">📋 کپی لینک</button><button id="shareReferral" type="button">📤 دعوت رفیق</button></div>
+            </div>
+            <div class="wallet-box withdraw-box">
+              <span class="eyebrow">برداشت وجه</span><h3>درخواست تسویه</h3>
+              <form id="withdrawForm">
+                <label>روش برداشت<select id="withdrawMethod"><option value="card">کارت‌به‌کارت</option><option value="usdt">تتر USDT · TRC20</option></select></label>
+                <label>مبلغ تومان<input id="withdrawAmount" inputmode="numeric" type="number" step="1000" required /></label>
+                <div id="cardFields"><label>نام صاحب کارت<input id="cardHolder" maxlength="80" /></label><label>شماره کارت<input id="cardNumber" inputmode="numeric" maxlength="19" placeholder="۶۲۱۹..." /></label></div>
+                <div id="usdtFields" hidden><label>آدرس کیف پول TRC20<input id="walletAddress" dir="ltr" maxlength="50" placeholder="T..." /></label><div class="usdt-preview">مقدار تقریبی: <b id="usdtPreview">—</b></div></div>
+                <button class="btn btn-cyan" type="submit">ثبت درخواست برداشت</button>
+              </form>
+              <p class="withdraw-note">واریزی تا ۲۴ ساعت آینده انجام و رسید تراکنش از ربات ارسال می‌شود.</p>
+            </div>
+          </div>
+          <div class="pending-withdrawals" id="pendingWithdrawals" hidden></div>
+          <div class="wallet-guest" id="walletGuest" hidden>برای کیف پول واقعی، Mini App را از داخل @Ajorparehbot باز کن.</div>
+        </section>
+
+        <div class="profile-grid">
+          <section class="achievements"><div class="section-heading compact"><div><span>کلکسیون افتخارات</span><h2>بج‌های من</h2></div><button>همه ۱۲ بج</button></div><div class="badge-grid">
+            <article><div class="badge-icon badge-fire">🔥</div><b>آتیش‌پاره</b><span>۷ روز استریک</span></article>
+            <article><div class="badge-icon badge-bolt">⚡</div><b>فوق سریع</b><span>زیر ۳۰۰ms</span></article>
+            <article><div class="badge-icon badge-lol">😂</div><b>ضد خنده</b><span>۳ برد متوالی</span></article>
+            <article class="locked"><div class="badge-icon">?</div><b>هنوز قفله</b><span>ادامه بده</span></article>
+          </div></section>
+          <aside class="settings-panel"><div class="section-heading compact"><div><span>همه‌چی دست خودت</span><h2>تنظیمات</h2></div></div>
+            <button class="settings-link" data-go="ai"><span class="setting-icon"><svg><use href="#i-bell"/></svg></span><span><b>یادآورها و دستیار AI</b><small>یادآور واقعی و ابزارهای هوشمند</small></span><svg><use href="#i-chevron"/></svg></button>
+            <button class="settings-link" data-go="shop"><span class="setting-icon">🛍</span><span><b>فروشگاه سرویس‌ها</b><small>خرید V2Ray و NPV با ستاره ⭐</small></span><svg><use href="#i-chevron"/></svg></button>
+            <label class="setting-row"><span class="setting-icon"><svg><use href="#i-zap"/></svg></span><span><b>لرزش و بازخورد لمسی</b><small>برای بردها و دکمه‌های بازی</small></span><input id="hapticsToggle" type="checkbox" checked /><i></i></label>
+            <button class="settings-link" id="fullscreenButton"><span class="setting-icon">⛶</span><span><b>حالت تمام‌صفحه</b><small>تجربه بهتر بازی و هوش مصنوعی</small></span><svg><use href="#i-chevron"/></svg></button>
+            <button class="settings-link" id="homeScreenButton"><span class="setting-icon">➕</span><span><b>افزودن به صفحه اصلی</b><small id="homeScreenStatus">اگر تلگرام پشتیبانی کند</small></span><svg><use href="#i-chevron"/></svg></button>
+            <button class="settings-link" data-go="support"><span class="setting-icon"><svg><use href="#i-help"/></svg></span><span><b>کمک و پشتیبانی</b><small dir="ltr">@Ajorparehbot</small></span><svg><use href="#i-chevron"/></svg></button>
+          </aside>
+        </div>
+      </section>
+
+      <section class="page" data-page="shop" aria-labelledby="shop-title">
+        <div class="rewards-hero">
+          <div><span class="section-kicker"><span></span> سرویس‌های اشتراکی با ستاره</span><h1 id="shop-title">فروشگاه سرویس‌ها</h1><p>V2Ray و NPV اختصاصی — پرداخت با ستاره‌های تلگرام ⭐ مستقیم از همین‌جا.</p></div>
+          <div class="coin-balance"><span>💱 نرخ هر ستاره</span><b id="shopStarRate">…</b><small>قیمت رسمی تلگرام × دلار لحظه‌ای</small></div>
+        </div>
+        <div id="shopCatalog" class="club-lower-grid"><p>در حال بارگذاری سرویس‌ها...</p></div>
+        <div class="page-gap"></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="ناوبری اصلی">
+      <button class="active" data-nav="games"><span><svg><use href="#i-game"/></svg></span><b>بازی‌ها</b></button>
+      <button data-nav="challenges"><span><svg><use href="#i-zap"/></svg></span><b>چالش‌ها</b></button>
+      <button data-nav="news"><span><svg><use href="#i-news"/></svg></span><b>خبر و جوک</b></button>
+      <button data-nav="media"><span><svg><use href="#i-external"/></svg></span><b>رسانه</b></button>
+      <button data-nav="ai"><span><svg><use href="#i-zap"/></svg></span><b>هوش مصنوعی</b></button>
+      <button data-nav="rewards"><span><svg><use href="#i-fire"/></svg></span><b>جوایز</b></button>
+      <button data-nav="leaderboard"><span><svg><use href="#i-trophy"/></svg></span><b>رتبه‌بندی</b></button>
+      <button data-nav="support"><span><svg><use href="#i-help"/></svg></span><b>پشتیبانی</b></button>
+      <button data-nav="profile"><span><svg><use href="#i-user"/></svg></span><b>پروفایل</b></button>
+    </nav>
+  </div>
+
+  <div class="profile-edit-backdrop" id="profileEditModal" aria-hidden="true">
+    <section class="profile-edit-modal" role="dialog" aria-modal="true" aria-labelledby="profileEditTitle">
+      <button class="profile-edit-close" type="button" aria-label="بستن"><svg><use href="#i-close"/></svg></button>
+      <span class="eyebrow">پروفایلت، حال‌وهوای خودت</span>
+      <h2 id="profileEditTitle">ویرایش پروفایل</h2>
+      <p>نام تلگرام خودکار وارد شده؛ اگر خواستی اسم، بیو و تصویر اختصاصی بذار.</p>
+      <div class="avatar-editor">
+        <img id="avatarPreview" src="assets/ajor-mascot.png" alt="پیش‌نمایش تصویر" />
+        <label class="avatar-upload">📷 انتخاب تصویر<input id="avatarFile" type="file" accept="image/png,image/jpeg,image/webp" /></label>
+        <button id="telegramAvatarReset" type="button">استفاده از عکس تلگرام</button>
+      </div>
+      <form id="profileEditForm">
+        <label>نام نمایشی<input id="profileNameInput" maxlength="50" required placeholder="نام نمایشی" /></label>
+        <label>بیو کوتاه<textarea id="profileBioInput" maxlength="120" placeholder="مثلاً: میم‌باز شبانه‌روزی ⚡"></textarea><small><span id="profileBioCount">۰</span>/۱۲۰</small></label>
+        <button class="btn btn-cyan" type="submit">ذخیره پروفایل <svg><use href="#i-check"/></svg></button>
+      </form>
+      <div class="profile-sync-status" id="profileSyncStatus">اطلاعات روی حساب Mini App ذخیره می‌شود.</div>
+    </section>
+  </div>
+
+  <div class="modal-backdrop" id="gameModal" aria-hidden="true">
+    <section class="game-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <button class="modal-close" type="button" aria-label="بستن"><svg><use href="#i-close"/></svg></button>
+      <div class="modal-label">بازی فوری</div>
+      <h2 id="modalTitle">شکار لحظه</h2>
+      <p id="modalDescription">وقتی صفحه سبز شد، سریع بزن.</p>
+      <div class="game-stage" id="gameStage"></div>
+      <div class="modal-actions" id="modalActions"></div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"><span><svg><use href="#i-check"/></svg></span><p><b>انجام شد!</b><small>پیامت با موفقیت ثبت شد.</small></p></div>
+</body>
+</html>

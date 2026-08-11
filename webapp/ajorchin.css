@@ -1,0 +1,184 @@
+/* ===== آجرچین (Ajorpareh Brick Stacking) ===== */
+.ac-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px 16px;
+}
+.ac-title {
+  font-size: 1.5rem;
+  text-align: center;
+  margin: 0;
+  background: linear-gradient(135deg, #ff8800, #ff0066);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.ac-stats {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+.ac-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 6px 16px;
+  min-width: 70px;
+}
+.ac-stat-label {
+  font-size: 0.7rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.ac-stat-value {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #ff8800;
+  font-variant-numeric: tabular-nums;
+}
+.ac-game-area {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+#ajorchinCanvas {
+  border: 2px solid rgba(255,136,0,0.4);
+  border-radius: 8px;
+  box-shadow: 0 0 20px rgba(255,136,0,0.15), inset 0 0 30px rgba(0,0,0,0.5);
+  max-width: 100%;
+  height: auto;
+}
+.ac-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.ac-next-label {
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+#ajorchinNext {
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.3);
+}
+.ac-reward-notice {
+  font-size: 0.8rem;
+  color: #00ff88;
+  text-align: center;
+  min-height: 20px;
+}
+.ac-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5,5,20,0.88);
+  border-radius: 8px;
+  gap: 10px;
+  z-index: 5;
+}
+.ac-overlay-text {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 0 15px rgba(255,136,0,0.6);
+}
+.ac-final-score {
+  font-size: 1.2rem;
+  color: #ff8800;
+}
+.ac-final-lines {
+  font-size: 0.85rem;
+  color: #aaa;
+}
+.ac-hint {
+  font-size: 0.8rem;
+  color: #888;
+  text-align: center;
+  max-width: 220px;
+}
+.ac-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 28px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.ac-btn-start {
+  background: linear-gradient(135deg, #ff8800, #ff0066);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(255,136,0,0.4);
+}
+.ac-btn-start:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255,136,0,0.6);
+}
+.ac-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 4px;
+}
+.ac-ctrl-btn {
+  width: 50px;
+  height: 50px;
+  border: 2px solid rgba(255,136,0,0.3);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.06);
+  color: #ff8800;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.ac-ctrl-btn:active {
+  background: rgba(255,136,0,0.2);
+  transform: scale(0.92);
+}
+.ac-btn-drop {
+  width: 60px;
+  background: rgba(255,0,102,0.15);
+  border-color: rgba(255,0,102,0.3);
+  color: #ff0066;
+}
+.ac-btn-hard {
+  background: rgba(0,255,136,0.1);
+  border-color: rgba(0,255,136,0.3);
+  color: #00ff88;
+}
+.ac-instructions {
+  font-size: 0.65rem;
+  color: #666;
+  text-align: center;
+  max-width: 320px;
+  line-height: 1.5;
+}
+@media (max-width: 420px) {
+  .ac-game-area { flex-direction: column; align-items: center; }
+  .ac-side { flex-direction: row; gap: 12px; }
+  .ac-ctrl-btn { width: 56px; height: 56px; font-size: 1.4rem; }
+  .ac-btn-drop { width: 66px; }
+}

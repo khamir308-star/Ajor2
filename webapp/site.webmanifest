@@ -1,0 +1,17 @@
+{
+  "name": "Mini App ربات آجُرپاره | Ajorpareh",
+  "short_name": "Ajorpareh",
+  "description": "هوش مصنوعی فارسی، دانلود عمومی، آپلود URL، بازی، یادآور، جوایز، QR، استیکر و GIF داخل تلگرام",
+  "lang": "fa-IR",
+  "dir": "rtl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b0a0f",
+  "theme_color": "#0b0a0f",
+  "categories": ["productivity", "utilities", "games", "entertainment", "social"],
+  "icons": [
+    {"src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

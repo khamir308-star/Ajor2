@@ -1,0 +1,189 @@
+/* ===== بازی حکم چهارنفره ===== */
+.hokm-feature-card {
+  background: radial-gradient(circle at 20% 0%, rgba(255, 193, 7, 0.18), transparent 55%),
+              linear-gradient(135deg, #2a1f05, #0f0c04);
+  border: 1px solid rgba(255, 193, 7, 0.35);
+}
+.hokm-art { display: flex; align-items: center; justify-content: center; gap: 8px; flex-direction: column; }
+.hokm-mini-card {
+  width: 42px; height: 58px; border-radius: 8px;
+  background: linear-gradient(160deg, #fffdf5, #e8e0cc);
+  color: #1a1a1a; font-size: 22px; display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.4);
+}
+.hokm-mini-card.gold { color: #b8860b; }
+.hokm-art b { color: #ffd54f; font-size: 20px; }
+.hokm-art i { font-style: normal; color: #ffd54f; opacity: 0.85; font-size: 12px; }
+
+.hokm-topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.hokm-topbar h1 { font-size: 18px; flex: 1; margin: 0; color: var(--text, #eef2ff); }
+.hokm-status-chip {
+  background: rgba(34, 230, 226, 0.12); color: #22e6e2; border: 1px solid rgba(34, 230, 226, 0.3);
+  border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 700;
+}
+.hokm-root { display: flex; flex-direction: column; gap: 12px; }
+.hokm-loading { text-align: center; color: var(--muted, #8a93a6); padding: 40px 0; }
+
+/* ===== میز حکم ===== */
+.hokm-table {
+  position: relative;
+  border-radius: 20px;
+  padding: 12px;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(34, 230, 226, 0.08), transparent 60%),
+    linear-gradient(160deg, #101b1e, #0a1214 60%, #071013);
+  border: 1px solid rgba(34, 230, 226, 0.18);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4), inset 0 0 40px rgba(34,230,226,0.04);
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.hokm-teamline { display: flex; justify-content: space-between; align-items: center; padding: 0 6px 8px; }
+.hokm-team {
+  border-radius: 12px; padding: 6px 10px; font-size: 12px; font-weight: 800; min-width: 96px; text-align: center;
+}
+.hokm-team.you { background: rgba(34, 230, 226, 0.1); border: 1px solid rgba(34, 230, 226, 0.35); color: #22e6e2; }
+.hokm-team.opp { background: rgba(255, 64, 129, 0.1); border: 1px solid rgba(255, 64, 129, 0.35); color: #ff4081; }
+.hokm-team small { display: block; font-weight: 500; opacity: 0.75; font-size: 10px; }
+
+.hokm-center { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; flex: 1; }
+.hokm-side { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.hokm-side .hokm-player-name { font-size: 11px; font-weight: 700; color: var(--muted, #8a93a6); }
+.hokm-side .hokm-player-name.active { color: #22e6e2; }
+.hokm-bot-cards { display: flex; }
+.hokm-bot-cards .hokm-card { width: 30px; height: 44px; margin-left: -16px; border-radius: 5px;
+  background: linear-gradient(135deg, #1a237e, #0d47a1);
+  border: 1.5px solid rgba(255,215,0,0.4);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  background-image: repeating-linear-gradient(45deg, transparent, transparent 3px, rgba(255,255,255,0.05) 3px, rgba(255,255,255,0.05) 6px); }
+.hokm-bot-cards .hokm-card:last-child { margin-left: 0; }
+.hokm-bot-cards .hokm-card::after { content: '🂠'; font-size: 18px; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); opacity: 0.6; }
+.hokm-bot-cards.leading .hokm-card { border-color: #ffd54f; box-shadow: 0 0 10px rgba(255,213,79,0.4); }
+
+.hokm-played { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 150px; }
+.hokm-played-slot { min-height: 92px; display: flex; align-items: center; justify-content: center; }
+.hokm-played-slot .hokm-card { width: 60px; height: 88px; font-size: 15px; }
+.hokm-played-slot .hokm-card .hokm-corner { font-size: 12px; }
+.hokm-played-slot .hokm-card .hokm-center { font-size: 26px; }
+.hokm-played-slot .hokm-card .hokm-face { font-size: 32px; }
+.hokm-played-slot.empty { border: 1px dashed rgba(255,255,255,0.12); border-radius: 12px; color: rgba(255,255,255,0.2); font-size: 20px; }
+
+.hokm-trump-box { text-align: center; padding: 8px 0; }
+.hokm-trump-chip {
+  display: inline-block; background: linear-gradient(135deg, #ffd54f, #f9a825);
+  color: #1a1200; border-radius: 999px; padding: 5px 14px; font-size: 13px; font-weight: 900;
+  box-shadow: 0 4px 14px rgba(255, 193, 7, 0.35);
+}
+.hokm-trump-chip small { display: block; font-size: 9px; font-weight: 600; opacity: 0.8; }
+
+.hokm-hand {
+  display: flex; justify-content: center; gap: 5px; padding: 10px 4px 4px;
+  min-height: 100px; flex-wrap: wrap;
+}
+.hokm-card {
+  width: 56px; height: 82px; border-radius: 8px;
+  background: linear-gradient(170deg, #ffffff, #f8f6f0);
+  border: 1.5px solid rgba(180, 160, 140, 0.5);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.8);
+  color: #16233c; font-weight: 800; font-size: 13px;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: space-between;
+  padding: 4px 3px; cursor: pointer; user-select: none;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  position: relative; overflow: hidden;
+}
+.hokm-card::before {
+  content: ''; position: absolute; inset: 3px;
+  border: 1px solid rgba(180, 160, 140, 0.2); border-radius: 5px; pointer-events: none;
+}
+.hokm-card .hokm-corner { font-size: 11px; line-height: 1; font-weight: 900; }
+.hokm-card .hokm-corner-top { position: absolute; top: 3px; left: 4px; text-align: left; }
+.hokm-card .hokm-corner-bottom { position: absolute; bottom: 3px; right: 4px; text-align: right; transform: rotate(180deg); }
+.hokm-card .hokm-center { font-size: 22px; line-height: 1; margin: auto 0; }
+.hokm-card .hokm-face { font-size: 28px; margin: auto 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.15)); }
+.hokm-card.red { color: #c62828; }
+.hokm-card.black { color: #1a1a1a; }
+.hokm-hand .hokm-card.suit-break { margin-inline-start: 12px; }
+.hokm-hand .hokm-card:hover { transform: translateY(-8px); box-shadow: 0 8px 18px rgba(0,0,0,0.45); }
+.hokm-hand .hokm-card.selected { transform: translateY(-14px); border-color: #22e6e2; box-shadow: 0 0 0 2px #22e6e2, 0 10px 20px rgba(0,0,0,0.5); }
+.hokm-hand .hokm-card.disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+.hokm-card.playable { border-color: rgba(34,230,226,0.6); }
+.hokm-card.played-anim { animation: hokmPlay 0.35s ease; }
+@keyframes hokmPlay { 0% { transform: translateY(-16px) scale(1.05); opacity: 0.6; } 100% { transform: none; opacity: 1; } }
+
+.hokm-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.hokm-btn {
+  border: none; border-radius: 14px; padding: 10px 18px; font-size: 14px; font-weight: 800;
+  font-family: inherit; cursor: pointer; color: #06121a;
+  background: linear-gradient(135deg, #22e6e2, #19b7c4); box-shadow: 0 6px 16px rgba(34,230,226,0.3);
+  transition: transform 0.1s ease, opacity 0.2s ease;
+}
+.hokm-btn:active { transform: scale(0.96); }
+.hokm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.hokm-btn.gold { background: linear-gradient(135deg, #ffd54f, #f9a825); box-shadow: 0 6px 16px rgba(255,193,7,0.35); }
+.hokm-btn.pink { background: linear-gradient(135deg, #ff80ab, #f50057); color: #fff; box-shadow: 0 6px 16px rgba(245,0,87,0.3); }
+.hokm-btn.ghost { background: transparent; color: #9fb3c8; border: 1px solid rgba(159,179,200,0.4); box-shadow: none; }
+
+.hokm-log {
+  background: rgba(0,0,0,0.3); border: 1px solid rgba(34,230,226,0.12);
+  border-radius: 14px; padding: 10px 14px; max-height: 130px; overflow-y: auto;
+  font-size: 12.5px; line-height: 1.9; color: #b9c8dd;
+}
+.hokm-log b { color: #ffd54f; }
+.hokm-log .win { color: #22e6e2; }
+
+/* ===== انتخاب حکم / نوع بازی ===== */
+.hokm-modal-backdrop {
+  position: fixed; inset: 0; background: rgba(3, 8, 12, 0.75); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; z-index: 60; padding: 16px;
+}
+.hokm-modal {
+  background: linear-gradient(170deg, #12222b, #0a141b);
+  border: 1px solid rgba(34,230,226,0.25); border-radius: 20px;
+  padding: 18px; width: 100%; max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.hokm-modal h3 { margin: 0 0 4px; color: #eaf2ff; font-size: 17px; }
+.hokm-modal p { margin: 0 0 14px; color: var(--muted, #8a93a6); font-size: 12.5px; }
+.hokm-suit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.hokm-suit-btn {
+  border-radius: 14px; padding: 14px 8px; background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12); color: #eaf2ff; cursor: pointer;
+  font-family: inherit; font-weight: 800; font-size: 15px; display: flex; flex-direction: column; gap: 4px; align-items: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.hokm-suit-btn:hover { border-color: rgba(34,230,226,0.6); }
+.hokm-suit-btn.red { color: #ff6b6b; }
+.hokm-suit-btn .hokm-suit-big { font-size: 26px; }
+.hokm-game-type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.hokm-type-btn {
+  border-radius: 14px; padding: 12px 8px; background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.12); color: #eaf2ff; cursor: pointer;
+  font-family: inherit; font-weight: 800; font-size: 14px; display: flex; flex-direction: column; gap: 3px; align-items: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.hokm-type-btn:hover { border-color: rgba(255, 213, 79, 0.7); }
+.hokm-type-btn small { font-size: 10px; font-weight: 500; color: var(--muted, #8a93a6); }
+
+/* ===== دشبورد ===== */
+.hokm-dash { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.hokm-dash-item {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px; padding: 8px; text-align: center;
+}
+.hokm-dash-item b { display: block; color: #eaf2ff; font-size: 16px; }
+.hokm-dash-item span { font-size: 10px; color: var(--muted, #8a93a6); }
+
+.hokm-diff-pick { display: flex; gap: 8px; justify-content: center; margin: 12px 0; flex-wrap: wrap; }
+.hokm-diff-btn {
+  border-radius: 999px; padding: 10px 18px; border: 1px solid rgba(34,230,226,0.3);
+  background: rgba(34,230,226,0.08); color: #22e6e2; font-family: inherit; font-weight: 800; cursor: pointer; font-size: 13px;
+}
+.hokm-diff-btn:hover { background: rgba(34,230,226,0.18); }
+.hokm-diff-btn.active { background: linear-gradient(135deg, #22e6e2, #19b7c4); color: #06121a; }
+.hokm-intro { text-align: center; padding: 20px 6px; }
+.hokm-intro h2 { color: #ffd54f; font-size: 20px; margin: 6px 0; }
+.hokm-intro p { color: var(--muted, #8a93a6); font-size: 13px; line-height: 1.9; margin: 0 auto 16px; max-width: 320px; }
+.hokm-rules { text-align: right; background: rgba(255,255,255,0.04); border-radius: 14px; padding: 10px 14px; font-size: 11.5px; color: #b9c8dd; line-height: 2; margin-bottom: 14px; }
+.hokm-rules b { color: #ffd54f; }

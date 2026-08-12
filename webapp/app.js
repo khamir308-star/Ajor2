@@ -114,6 +114,18 @@
     }
   }
 
+  function applyTelegramTheme() {
+    // اتصال متغیرهای تم تلگرام به CSS؛ اگر کلاینت تم ندهد، مقدارهای قبلی طراحی حفظ می‌شوند
+    const tp = tgCandidate?.themeParams;
+    if (!tp) return;
+    const style = document.documentElement.style;
+    if (tp.bg_color) style.setProperty("--tg-bg", tp.bg_color);
+    if (tp.text_color) style.setProperty("--tg-text", tp.text_color);
+    if (tp.hint_color) style.setProperty("--tg-hint", tp.hint_color);
+    if (tp.link_color) style.setProperty("--tg-link", tp.link_color);
+    if (tp.button_color) style.setProperty("--tg-button", tp.button_color);
+  }
+
   function setupTelegram() {
     if (!tg) return;
     tg.ready();
@@ -123,6 +135,11 @@
       tg.setBackgroundColor("#0b0a0f");
       tg.setBottomBarColor("#0b0a0f");
     } catch (_) {}
+    // پایداری ویوپورت: سوایپ عمودی تلگرام وسط بازی اپ را نبندد (فقط SDKهای جدید)
+    try { if (typeof tg.disableVerticalSwipes === "function") tg.disableVerticalSwipes(); } catch (_) {}
+    applyTelegramTheme();
+    try { tg.onEvent("themeChanged", applyTelegramTheme); } catch (_) {}
+    try { if (tg.BackButton) tg.BackButton.onClick(() => navigate(lastTabPage || "home")); } catch (_) {}
     const applySafeArea = () => {
       const safe = tg.safeAreaInset || {};
       const content = tg.contentSafeAreaInset || {};
@@ -187,21 +204,62 @@
     } catch (error) { console.warn("Game reward sync failed", error); }
   }
 
+  // ===== لود تنبل اسکریپت‌های بازی (code-splitting: فقط وقتی کاربر وارد صفحهٔ بازی شد) =====
+  const GAME_SCRIPTS = {
+    hokm: { src: "hokm.js?v=2-lazy", globalName: "HokmApp" },
+    boardgames: { src: "boardgames.js?v=2-lazy", globalName: "BoardGamesApp" },
+    ajorchin: { src: "ajorchin.js?v=2-lazy", globalName: "AjorchinGame" },
+    snake: { src: "snake.js?v=2-lazy", globalName: "SnakeGame" },
+  };
+  const gameScriptPromises = {};
+  function loadGameScript(page) {
+    const meta = GAME_SCRIPTS[page];
+    if (!meta || window[meta.globalName]) return Promise.resolve();
+    if (!gameScriptPromises[page]) {
+      gameScriptPromises[page] = new Promise((resolve) => {
+        const script = document.createElement("script");
+        script.src = meta.src;
+        script.onload = () => resolve();
+        script.onerror = () => { gameScriptPromises[page] = null; resolve(); };
+        document.head.appendChild(script);
+      });
+    }
+    return gameScriptPromises[page];
+  }
+
+  // زیرصفحه‌ها (نه تب‌های اصلی) → دکمهٔ بازگشت بومی تلگرام نمایش داده می‌شود
+  const SUB_PAGES = new Set(["hokm", "calendar", "boardgames", "ajorchin", "snake", "music", "shop"]);
+  let lastTabPage = "home";
+
+  function updateBackButton(page) {
+    if (!tg?.BackButton) return;
+    try {
+      if (SUB_PAGES.has(page)) tg.BackButton.show();
+      else tg.BackButton.hide();
+    } catch (_) {}
+  }
+
   function navigate(page, pushHash = true) {
     const target = $(`.page[data-page="${page}"]`);
     if (!target) return;
     $$(".page").forEach(section => section.classList.toggle("active", section === target));
     $$("[data-nav]").forEach(button => button.classList.toggle("active", button.dataset.nav === page));
     if (pushHash && history.replaceState) history.replaceState(null, "", `#${page}`);
+    if (!SUB_PAGES.has(page)) lastTabPage = page;
+    updateBackButton(page);
     if (page === "news") loadNews();
     if (page === "rewards") loadRewardsClub();
     if (page === "ai") { loadAIStatus(); loadReminders(); }
-    if (page === "hokm") { if (window.HokmApp) window.HokmApp.mount(); }
-    else if (window.HokmApp) { window.HokmApp.unmount(); }
-    if (page === "boardgames") { if (window.BoardGamesApp) window.BoardGamesApp.mount(); }
-    else if (window.BoardGamesApp) { window.BoardGamesApp.unmount(); }
-    if (page === "ajorchin") { if (window.AjorchinGame) window.AjorchinGame.mount(); }
-    if (page === "snake") { if (window.SnakeGame) window.SnakeGame.mount(); }
+    if (page !== "hokm" && window.HokmApp) window.HokmApp.unmount();
+    if (page !== "boardgames" && window.BoardGamesApp) window.BoardGamesApp.unmount();
+    if (GAME_SCRIPTS[page]) {
+      loadGameScript(page).then(() => {
+        if (page === "hokm" && window.HokmApp) window.HokmApp.mount();
+        if (page === "boardgames" && window.BoardGamesApp) window.BoardGamesApp.mount();
+        if (page === "ajorchin" && window.AjorchinGame) window.AjorchinGame.mount();
+        if (page === "snake" && window.SnakeGame) window.SnakeGame.mount();
+      });
+    }
     if (page === "calendar") { renderCalendar(); }
     if (page === "music") { setupMusicTabs(); }
     if (page === "shop") { loadShop(); }
@@ -1717,12 +1775,16 @@
 
   async function convertWalletPoints() {
     if (!walletState || !tgCandidate?.initData) return showToast("داخل تلگرام باز کن", "تبدیل امتیاز فقط داخل Mini App فعال است.", "error");
+    const button = $("#convertPointsButton");
+    if (button?.dataset.busy === "1") return;
+    if (button) { button.dataset.busy = "1"; button.disabled = true; }
     const points = Number($("#convertPoints").value || 0);
     try {
       const response = await fetch("/api/wallet/convert", { method: "POST", headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": tgCandidate.initData }, body: JSON.stringify({ points }) });
       if (!response.ok) throw new Error(await response.text());
       const data = await response.json(); walletState = data.wallet; renderWallet(); haptic("success"); burstConfetti(); showToast("تبدیل انجام شد", `${fa.format(data.amount_toman)} تومان به کیف پول اضافه شد.`);
     } catch (error) { showToast("تبدیل انجام نشد", String(error.message).includes("enough") ? "امتیاز کافی نداری." : "مقدار را بررسی کن.", "error"); }
+    finally { if (button) { button.dataset.busy = ""; button.disabled = false; } }
   }
 
   async function submitWithdrawal(event) {
@@ -1797,9 +1859,17 @@
       catch (error) { button.disabled = false; showToast("خرید نشد", error.message.includes("enough") ? "سکه کافی نداری." : "دوباره تلاش کن.", "error"); }
     });
     $("#raffleList").innerHTML = clubState.raffles.length ? clubState.raffles.map(item => `<article class="club-entry"><b>🎡 ${escapeHTML(item.title)}</b><p>${fa.format(item.cost)} سکه · ${fa.format(item.entries)} ورودی</p><div class="club-entry-actions"><button data-raffle-join="${item.id}">شرکت</button></div></article>`).join("") : "<p>فعلاً قرعه‌کشی فعالی نیست.</p>";
-    $$('[data-raffle-join]').forEach(button => button.onclick = async () => { try { const data = await economyPost("/api/raffle/join", { raffle_id: button.dataset.raffleJoin }); clubState.coins = data.coins; renderRewardsClub(); showToast("ثبت شد", "ورودی قرعه‌کشی خریداری شد."); } catch (error) { showToast("ثبت نشد", "سکه یا ظرفیت را بررسی کن.", "error"); } });
+    $$('[data-raffle-join]').forEach(button => button.onclick = async () => {
+      if (button.dataset.busy === "1") return; button.dataset.busy = "1"; button.disabled = true;
+      try { const data = await economyPost("/api/raffle/join", { raffle_id: button.dataset.raffleJoin }); clubState.coins = data.coins; renderRewardsClub(); showToast("ثبت شد", "ورودی قرعه‌کشی خریداری شد."); }
+      catch (error) { button.dataset.busy = ""; button.disabled = false; showToast("ثبت نشد", "سکه یا ظرفیت را بررسی کن.", "error"); }
+    });
     $("#predictionList").innerHTML = clubState.predictions.length ? clubState.predictions.map(item => `<article class="club-entry"><b>📈 ${escapeHTML(item.question)}</b><p>انتخاب کن؛ مبلغ پیش‌فرض ۲۰ سکه</p><div class="club-entry-actions">${item.options.map((option,index) => `<button data-prediction="${item.id}" data-option="${index}">${escapeHTML(option)}</button>`).join("")}</div></article>`).join("") : "<p>فعلاً پیش‌بینی فعالی نیست.</p>";
-    $$('[data-prediction]').forEach(button => button.onclick = async () => { try { const data = await economyPost("/api/prediction/bet", { prediction_id: button.dataset.prediction, option: Number(button.dataset.option), stake: 20 }); clubState.coins = data.coins; renderRewardsClub(); showToast("پیش‌بینی ثبت شد", "اگر درست باشه از استخر جایزه می‌گیری."); } catch (error) { showToast("ثبت نشد", "قبلاً رأی دادی یا سکه کافی نداری.", "error"); } });
+    $$('[data-prediction]').forEach(button => button.onclick = async () => {
+      if (button.dataset.busy === "1") return; button.dataset.busy = "1"; button.disabled = true;
+      try { const data = await economyPost("/api/prediction/bet", { prediction_id: button.dataset.prediction, option: Number(button.dataset.option), stake: 20 }); clubState.coins = data.coins; renderRewardsClub(); showToast("پیش‌بینی ثبت شد", "اگر درست باشه از استخر جایزه می‌گیری."); }
+      catch (error) { button.dataset.busy = ""; button.disabled = false; showToast("ثبت نشد", "قبلاً رأی دادی یا سکه کافی نداری.", "error"); }
+    });
   }
 
   async function loadRewardsClub(force = false) {
@@ -1973,14 +2043,18 @@
               </button>`).join("")}
           </div>
         </section>`).join("");
-      $$(".service-buy").forEach(button => button.addEventListener("click", () => buyWithStars(button.dataset.buy)));
+      $$(".service-buy").forEach(button => button.addEventListener("click", () => buyWithStars(button.dataset.buy, button)));
     } catch (error) {
       container.innerHTML = "<p>❌ خطا در دریافت سرویس‌ها. دوباره تلاش کن.</p>";
       console.warn("Shop load failed", error);
     }
   }
 
-  async function buyWithStars(key) {
+  async function buyWithStars(key, button) {
+    // محافظ double-request: تا بسته‌شدن فاکتور، دکمه قفل می‌ماند (جلوگیری از پرداخت ستارهٔ تکراری)
+    if (button?.dataset.busy === "1") return;
+    if (button) { button.dataset.busy = "1"; button.disabled = true; }
+    const release = () => { if (button) { button.dataset.busy = ""; button.disabled = false; } };
     const [serviceType, months] = key.split("|");
     try {
       const headers = { "Content-Type": "application/json" };
@@ -1990,12 +2064,13 @@
       });
       if (!response.ok) {
         let detail = "خطا در ساخت فاکتور";
-        try { const err = await response.json(); detail = err.error || err.detail || detail; } catch (e) { /* ignore */ }
+        try { const err = await response.json(); detail = err.message || err.error || err.detail || detail; } catch (e) { /* ignore */ }
         showToast("❌ " + detail, "دوباره تلاش کن.", "error");
+        release();
         return;
       }
       const data = await response.json();
-      if (!data.invoice_url) { showToast("❌ لینک پرداخت ساخته نشد", "دوباره تلاش کن.", "error"); return; }
+      if (!data.invoice_url) { showToast("❌ لینک پرداخت ساخته نشد", "دوباره تلاش کن.", "error"); release(); return; }
       if (window.Telegram?.WebApp?.openInvoice) {
         window.Telegram.WebApp.openInvoice(data.invoice_url, status => {
           if (status === "paid") {
@@ -2005,12 +2080,15 @@
           } else if (status === "failed") {
             showToast("❌ پرداخت ناموفق بود", "دوباره تلاش کن.", "error");
           }
+          release(); // بعد از هر نتیجه‌ای (paid/cancelled/failed/pending) دکمه آزاد شود
         });
       } else {
         window.open(data.invoice_url, "_blank");
+        release();
       }
     } catch (error) {
       showToast("❌ خطا: " + String(error.message || error), "دوباره تلاش کن.", "error");
+      release();
     }
   }
 

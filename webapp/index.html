@@ -84,11 +84,8 @@
   }
   </script>
   <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
-  <script src="hokm.js?v=1" defer></script>
-  <script src="boardgames.js?v=1" defer></script>
-  <script src="ajorchin.js?v=1" defer></script>
-  <script src="snake.js?v=1" defer></script>
-  <script src="app.js?v=20260808-calendar-quiz" defer></script>
+  <!-- اسکریپت‌های بازی (hokm/boardgames/ajorchin/snake) برای LCP سریع‌تر به‌صورت تنبل داخل app.js لود می‌شوند -->
+  <script src="app.js?v=20260813-audit-perf" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/app/sw.js').catch(() => {});

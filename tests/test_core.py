@@ -1595,6 +1595,116 @@ class AsyncCoreTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await client.close()
 
+    @staticmethod
+    def _signed_init_data(user_id=42):
+        pairs = {
+            "auth_date": str(int(time.time())),
+            "query_id": "test-query",
+            "user": json.dumps({"id": user_id, "first_name": "Test"}, separators=(",", ":")),
+        }
+        check_string = "\n".join(f"{key}={value}" for key, value in sorted(pairs.items()))
+        secret = hmac.new(b"WebAppData", bot.TOKEN.encode(), hashlib.sha256).digest()
+        pairs["hash"] = hmac.new(secret, check_string.encode(), hashlib.sha256).hexdigest()
+        return urlencode(pairs)
+
+    async def test_api_rate_limit_blocks_excessive_requests(self):
+        async def dummy(request):
+            return web.json_response({"ok": True})
+
+        app = web.Application(middlewares=[bot.api_rate_limit_middleware])
+        app.router.add_get("/api/dummy", dummy)
+        app.router.add_get("/other", dummy)
+        original_max = bot.API_RATE_MAX_REQUESTS
+        bot.API_RATE_MAX_REQUESTS = 5
+        bot._api_rate_hits.clear()
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        try:
+            statuses = []
+            for _ in range(7):
+                response = await client.get("/api/dummy")
+                statuses.append(response.status)
+            self.assertEqual(statuses[:5], [200] * 5)
+            self.assertEqual(statuses[5:], [429, 429])
+            limited = await client.get("/api/dummy")
+            self.assertIn("Retry-After", limited.headers)
+            # مسیرهای غیر API محدود نمی‌شوند
+            other = await client.get("/other")
+            self.assertEqual(other.status, 200)
+        finally:
+            await client.close()
+            bot.API_RATE_MAX_REQUESTS = original_max
+            bot._api_rate_hits.clear()
+
+    async def test_economy_endpoints_reject_missing_init_data(self):
+        app = web.Application(middlewares=[bot.api_rate_limit_middleware])
+        app.router.add_post("/api/spin", bot.miniapp_spin_api)
+        app.router.add_post("/api/prediction/bet", bot.miniapp_prediction_bet_api)
+        app.router.add_post("/api/raffle/join", bot.miniapp_raffle_join_api)
+        app.router.add_post("/api/shop/purchase", bot.miniapp_shop_purchase_api)
+        app.router.add_post("/api/wallet/convert", bot.miniapp_wallet_convert_api)
+        app.router.add_get("/api/economy", bot.miniapp_economy_api)
+        bot._api_rate_hits.clear()
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        try:
+            for path in ("/api/spin", "/api/prediction/bet", "/api/raffle/join", "/api/shop/purchase", "/api/wallet/convert"):
+                response = await client.post(path, json={})
+                self.assertEqual(response.status, 401, path)
+            response = await client.get("/api/economy")
+            self.assertEqual(response.status, 401)
+        finally:
+            await client.close()
+            bot._api_rate_hits.clear()
+
+    async def test_banned_user_is_blocked_on_miniapp_wallet_api(self):
+        class FakeBanUsers:
+            def __init__(self, doc):
+                self.doc = doc
+
+            async def find_one(self, query, *args, **kwargs):
+                return dict(self.doc) if self.doc else None
+
+            async def update_one(self, *args, **kwargs):
+                class _R:
+                    modified_count = 1
+                    upserted_id = None
+
+                return _R()
+
+        app = web.Application(middlewares=[bot.api_rate_limit_middleware])
+        app.router.add_get("/api/wallet", bot.miniapp_wallet_api)
+        bot._api_rate_hits.clear()
+        original_users = bot.users_col
+        bot.users_col = FakeBanUsers({"_id": 42, "is_banned": True})
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        try:
+            init_data = self._signed_init_data(42)
+            response = await client.get("/api/wallet", headers={"X-Telegram-Init-Data": init_data})
+            self.assertEqual(response.status, 403)  # کاربر بن‌شده حتی با initData معتبر رد می‌شود
+        finally:
+            await client.close()
+            bot.users_col = original_users
+            bot._api_rate_hits.clear()
+
+    def test_game_scripts_are_lazy_loaded_and_double_submit_guarded(self):
+        index = Path("webapp/index.html").read_text()
+        app_js = Path("webapp/app.js").read_text()
+        sw_js = Path("webapp/sw.js").read_text()
+        # اسکریپت‌های بازی دیگر eager در index لود نمی‌شوند (code-splitting برای LCP)
+        for src in ("hokm.js", "boardgames.js", "ajorchin.js", "snake.js"):
+            self.assertNotIn(f'src="{src}', index)
+        self.assertIn("GAME_SCRIPTS", app_js)
+        self.assertIn("loadGameScript", app_js)
+        # دکمهٔ بازگشت بومی تلگرام برای زیرصفحه‌ها فعال است
+        self.assertIn("BackButton", app_js)
+        self.assertIn("SUB_PAGES", app_js)
+        # محافظ double-request روی پرداخت ستاره و دکمه‌های اقتصادی
+        self.assertIn('dataset.busy', app_js)
+        # کش سرویس‌ورکر با نسخه‌های جدید همگام است
+        self.assertIn("hokm.js?v=2-lazy", sw_js)
+
     async def test_private_url_is_rejected(self):
         with self.assertRaises(MediaServiceError):
             await validate_public_url("http://127.0.0.1/private.mp4")

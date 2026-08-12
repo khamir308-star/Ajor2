@@ -1,18 +1,19 @@
 /* ===== Service Worker — Ajorpareh Mini App Offline Cache ===== */
-const CACHE_NAME = 'ajorpareh-v5-calendar-quiz';
+const CACHE_NAME = 'ajorpareh-v6-audit-perf';
 const STATIC_ASSETS = [
   '/app/',
   '/app/index.html',
   '/app/app.js',
+  '/app/app.js?v=20260813-audit-perf',
   '/app/styles.css',
   '/app/site.webmanifest',
   '/app/hokm.css',
-  '/app/hokm.js',
-  '/app/boardgames.js',
+  '/app/hokm.js?v=2-lazy',
+  '/app/boardgames.js?v=2-lazy',
   '/app/ajorchin.css',
-  '/app/ajorchin.js',
+  '/app/ajorchin.js?v=2-lazy',
   '/app/snake.css',
-  '/app/snake.js',
+  '/app/snake.js?v=2-lazy',
   '/app/landing.css',
 ];
 

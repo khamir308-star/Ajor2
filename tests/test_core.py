@@ -441,8 +441,10 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(ts.normalize_city("تهران"), "Tehran")
         self.assertEqual(ts._parse_crypto_symbol("بیت‌کوین"), "bitcoin")
         self.assertEqual(ts._parse_currency("تومان"), "IRR")
-        # بررسی امنیت رمز (محلی — بدون شبکه)
+        # بررسی امنیت رمز (HIBP range API — فقط پیشوند هش ارسال می‌شود)
         count = ts.pwned_password_count("this-is-a-unique-test-password-xyz-12345")
+        if count == -1:
+            self.skipTest("Pwned Passwords API در این محیط در دسترس نیست")
         self.assertEqual(count, 0)
         # دکمه پست خودکار در پنل
         admin = bot.admin_menu()

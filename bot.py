@@ -109,6 +109,7 @@ from media_service import (
     download_audio_track,
     download_direct_file,
     download_social_media,
+    fetch_instagram_metadata,
     inspect_link,
     normalized_host,
     normalize_youtube_url,
@@ -1295,7 +1296,7 @@ REPLY_BUTTON_LABELS: set[str] = {
     "🎬 دانلود یوتیوب", "🧩 API شکلک سفارشی", "🤖 راهنمای برنامه‌نویسان",
     "↩️ ابزارهای ربات", "↩️ پشتیبانی",
     # دانلود
-    "📸 دانلود اینستاگرام", "🎵 دانلود تیک‌تاک", "▶️ دانلود یوتیوب",
+    "📸 دانلود اینستاگرام", "🖼 پروفایل اینستاگرام", "🎵 دانلود تیک‌تاک", "▶️ دانلود یوتیوب",
     "🌐 دانلود سایر شبکه‌ها", "🔗 آپلود فایل از URL", "🛡 بررسی امنیت لینک",
     "💬 کپی متن کامنت اینستاگرام", "🎵 موسیقی", "📋 دانلودهای اخیر", "📊 سهمیه دانلود", "ℹ️ راهنمای دانلود",
     "↩️ مرکز دانلود و آپلود",
@@ -2619,10 +2620,10 @@ def info_reply_menu() -> ReplyKeyboardMarkup:
 
 def media_download_reply_menu() -> ReplyKeyboardMarkup:
     return persistent_keyboard([
-        ["📸 دانلود اینستاگرام", "🎵 دانلود تیک‌تاک"],
-        ["▶️ دانلود یوتیوب", "🌐 دانلود سایر شبکه‌ها"],
-        ["🔗 آپلود فایل از URL", "🛡 بررسی امنیت لینک"],
-        ["💬 کپی متن کامنت اینستاگرام"],
+        ["📸 دانلود اینستاگرام", "🖼 پروفایل اینستاگرام"],
+        ["🎵 دانلود تیک‌تاک", "▶️ دانلود یوتیوب"],
+        ["🌐 دانلود سایر شبکه‌ها", "🔗 آپلود فایل از URL"],
+        ["🛡 بررسی امنیت لینک", "💬 کپی متن کامنت اینستاگرام"],
         ["🎵 موسیقی", "📋 دانلودهای اخیر"],
         ["📊 سهمیه دانلود", "ℹ️ راهنمای دانلود"],
         ["↩️ ابزارهای ربات"],
@@ -4762,11 +4763,39 @@ async def process_media_job(job: dict) -> None:
                 else:
                     item = await download_direct_file(http_session, job["url"], folder, MAX_MEDIA_BYTES)
                 title, items = item.title, [item]
+            # متادیتای عمومی پست/ریلز اینستاگرام (کپشن، لایک، ویو و…) از مسیر embed — بدون ورود
+            instagram_meta: dict = {}
+            if job["mode"] == "social" and "instagram" in normalized_host(str(job.get("url", ""))) and http_session is not None:
+                try:
+                    instagram_meta = await fetch_instagram_metadata(http_session, str(job.get("url", ""))) or {}
+                except Exception as meta_exc:
+                    log.warning("instagram metadata fetch failed: %s", meta_exc)
+                    instagram_meta = {}
+            instagram_info_lines: list[str] = []
+            if instagram_meta.get("username"):
+                instagram_info_lines.append(f"👤 @{instagram_meta['username']}")
+            stat_bits = []
+            if instagram_meta.get("likes"):
+                stat_bits.append(f"❤️ {instagram_meta['likes']} لایک")
+            if instagram_meta.get("views"):
+                stat_bits.append(f"👁 {instagram_meta['views']} بازدید")
+            if instagram_meta.get("comments"):
+                stat_bits.append(f"💬 {instagram_meta['comments']} کامنت")
+            if stat_bits:
+                instagram_info_lines.append(" · ".join(stat_bits))
+            # کپشن پست را برای فلوی «متن پست» و دکمهٔ کپی روی اولین آیتم بگذار
+            if instagram_meta.get("caption") and items and not getattr(items[0], "caption", ""):
+                try:
+                    items[0].caption = instagram_meta["caption"][:2000]
+                except Exception:
+                    pass
             sent_ids = []
             for index, item in enumerate(items, 1):
                 prefix = "🎵" if job["mode"] == "audio" else "📥"
+                info_block = ("\n".join(instagram_info_lines) + "\n") if (index == 1 and instagram_info_lines) else ""
                 caption = (
                     f"{prefix} {title[:180]}\n"
+                    f"{info_block}"
                     f"فایل {index}/{len(items)} · {item.size / 1024 / 1024:.1f} MB\n\n"
                     "⚠️ فقط برای محتوای عمومی و استفاده مجاز/شخصی؛ حقوق صاحب اثر را رعایت کن."
                 )
@@ -16423,9 +16452,21 @@ async def handle_text(message: types.Message):
             "📥 لینک عمومی پست/Reel/Shorts/ویدئو رو بفرست.\n\n"
             "🌍 پلتفرم‌های پشتیبانی‌شده: اینستاگرام، تیک‌تاک، یوتیوب، X، فیسبوک، ردیت، پینترست، تردز، ویمیو، دیلی‌موشن، توییچ، ساندکلود، بندکمپ، VK، OK، روتوب، بیلی‌بیلی، استریمبل، رامبل، آدیسی، آرکایو، کیسک، گوگل‌درایو، دراپ‌باکس و ده‌ها سایت دیگه.\n"
             "🔎 حتی اگه سایت خاصی تو لیست نباشه، تلاش می‌کنم ویدئوش رو پیدا کنم.\n\n"
+            "📊 برای کلیپ/پست اینستاگرام، کپشن، تعداد لایک، بازدید و کامنت هم کنار فایل می‌فرستم.\n"
+            "🖼 برای عکس پروفایل اینستاگرام، دکمهٔ «🖼 پروفایل اینستاگرام» رو بزن.\n\n"
             "🎬 ویدئوهای بزرگ خودکار فشرده‌سازی می‌شن تا قابل ارسال باشن + دکمه استخراج صوت MP3.\n"
             "محتوای خصوصی، نیازمند ورود یا DRM قابل دریافت نیست. /cancel",
             reply_markup=media_download_reply_menu(),
+        )
+    if text == "🖼 پروفایل اینستاگرام":
+        media_request_sessions[user_id] = "social"
+        return await message.answer(
+            "🖼 لینک صفحهٔ پروفایل اینستاگرام رو بفرست؛ مثلاً:\n"
+            "<code>https://www.instagram.com/username/</code>\n\n"
+            "عکس پروفایل پیج‌های عمومی رو بدون نیاز به ورود دریافت می‌کنم. "
+            "پیج‌های خصوصی یا محدود قابل دریافت نیستن.\n"
+            "🎟 هر دریافت، ۱ توکن از سهمیهٔ دانلودت کم می‌کنه. /cancel",
+            parse_mode="HTML", reply_markup=media_download_reply_menu(),
         )
     if text == "🔗 آپلود فایل از URL":
         media_request_sessions[user_id] = "direct"
@@ -16443,6 +16484,8 @@ async def handle_text(message: types.Message):
         return await message.answer(
             "ℹ️ <b>مرکز رسانه</b>\n\n"
             "📸 دانلود: اینستاگرام، تیک‌تاک، یوتیوب، X، فیسبوک، ردیت، دیلی‌موشن، توییچ، ساندکلود، گوگل‌درایو و ده‌ها سایت دیگه؛ فقط لینک عمومی و بدون ورود.\n"
+            "🖼 پروفایل اینستاگرام: لینک صفحهٔ کاربر رو بفرست تا عکس پروفایلش رو بگیرم (فقط پیج عمومی).\n"
+            "📊 کلیپ/پست اینستاگرام: همراه فایل، کپشن، تعداد لایک، بازدید و کامنت هم می‌فرستم.\n"
             f"🔗 آپلود URL: لینک مستقیم هر فایل عمومی تا {media_size_label()}؛ تقریباً هر فرمتی (به‌جز صفحهٔ سایت).\n"
             "🎬 ویدئوهای بزرگ‌تر از سقف، خودکار فشرده‌سازی می‌شن و قابل ارسال می‌شن.\n"
             "🎵 بعد از هر ویدئو، دکمه استخراج صوت MP3 هم داری.\n"

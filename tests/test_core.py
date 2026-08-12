@@ -43,7 +43,11 @@ from instagram_comment_service import (
 from media_service import (
     MediaServiceError,
     classify_social_download_error,
+    extract_instagram_post_metadata,
+    extract_instagram_profile_image_url,
     extract_instagram_public_media_urls,
+    instagram_username_from_url,
+    is_instagram_profile_url,
     is_instagram_public_url,
     is_social_url,
     looks_like_hls_manifest,
@@ -1203,6 +1207,50 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(bot.DIRECT_MEDIA_URL_RE.match("https://cdn.site.com/clip.mp4?x=1"))
         self.assertTrue(bot.DIRECT_MEDIA_URL_RE.match("https://cdn.site.com/app.apk"))
         self.assertIsNone(bot.DIRECT_MEDIA_URL_RE.match("https://site.com/watch?v=abc"))
+
+    def test_instagram_profile_url_detection(self):
+        # لینک‌های پروفایل معتبر
+        self.assertTrue(is_instagram_profile_url("https://www.instagram.com/someuser/"))
+        self.assertTrue(is_instagram_profile_url("https://instagram.com/user.name_1"))
+        self.assertTrue(is_instagram_profile_url("https://m.instagram.com/abc123/?utm_source=ig"))
+        # مسیرهای محتوا و رزروشده پروفایل نیستند
+        self.assertFalse(is_instagram_profile_url("https://www.instagram.com/p/AbC123xyz/"))
+        self.assertFalse(is_instagram_profile_url("https://www.instagram.com/reel/AbC123xyz/"))
+        self.assertFalse(is_instagram_profile_url("https://www.instagram.com/stories/user/123/"))
+        self.assertFalse(is_instagram_profile_url("https://www.instagram.com/explore/"))
+        self.assertFalse(is_instagram_profile_url("https://www.instagram.com/"))
+        self.assertFalse(is_instagram_profile_url("https://example.com/someuser/"))
+        self.assertEqual(instagram_username_from_url("https://www.instagram.com/Ajor_pareh/?x=1"), "Ajor_pareh")
+
+    def test_instagram_post_metadata_extraction(self):
+        body = (
+            '<meta property="og:description" content="1,234 likes, 56 comments - کپشن تستی این پست اینستاگرام">'
+            '<div class="Caption"><a class="CaptionUsername">@testuser</a>کپشن داخل embed</div>'
+            '"video_view_count": 98765'
+        )
+        meta = extract_instagram_post_metadata(body)
+        self.assertEqual(meta["likes"], "1,234")
+        self.assertEqual(meta["comments"], "56")
+        self.assertEqual(meta["views"], "98765")
+        self.assertIn("کپشن تستی", meta["caption"])
+        self.assertEqual(meta["username"], "testuser")
+        # بدنهٔ خالی → dict خالی بدون خطا
+        empty = extract_instagram_post_metadata("")
+        self.assertEqual(empty, {"caption": "", "likes": "", "comments": "", "views": "", "username": ""})
+
+    def test_instagram_profile_image_url_only_allows_cdn_hosts(self):
+        good = '<meta property="og:image" content="https://scontent.cdninstagram.com/v/t51/x.jpg">'
+        self.assertTrue(extract_instagram_profile_image_url(good).startswith("https://scontent.cdninstagram.com"))
+        # og:image جعلی به میزبان غیرمجاز نباید قبول شود (جلوگیری از SSRF)
+        evil = '<meta property="og:image" content="https://evil.example.com/steal.jpg">'
+        self.assertEqual(extract_instagram_profile_image_url(evil), "")
+        internal = '<meta property="og:image" content="http://127.0.0.1/x.jpg">'
+        self.assertEqual(extract_instagram_profile_image_url(internal), "")
+
+    def test_instagram_profile_button_in_media_menu(self):
+        texts = [b.text for row in bot.media_download_reply_menu().keyboard for b in row]
+        self.assertIn("🖼 پروفایل اینستاگرام", texts)
+        self.assertIn("📸 دانلود اینستاگرام", texts)
 
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg is installed in the Railway Docker image")
     def test_compress_video_to_fit_and_audio_extraction(self):

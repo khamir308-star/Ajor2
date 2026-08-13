@@ -17802,10 +17802,26 @@ async def occasion_api(request: web.Request):
             online = await fetch_online_occasions(tehran_now.year, tehran_now.month, tehran_now.day)
             occasion_cache.update({"key": cache_key, "expires_at": now_monotonic + OCCASION_CACHE_TTL, "online": online})
     curated = CURATED_WORLD_DAYS.get(key, [])
-    items: list[dict] = [{"title": title, "source": "تقویم Ajorpareh"} for title in curated]
-    known_titles = {item["title"] for item in items}
+    items: list[dict] = []
+    known_titles: set[str] = set()
+    # اول مناسبت‌های شمسی و قمری (تقویم ایرانی) — مهم‌ترین‌ها برای کاربر
+    try:
+        cal_info = cal_today_info(tehran_now)
+        for title in cal_info.get("occasions") or []:
+            t = str(title).strip()
+            if t and t not in known_titles:
+                items.append({"title": t, "source": "تقویم شمسی"})
+                known_titles.add(t)
+    except Exception:
+        pass
+    # بعد مناسبت‌های جهانی میلادی (کاتالوگ داخلی)
+    for title in curated:
+        if title not in known_titles:
+            items.append({"title": title, "source": "تقویم Ajorpareh"})
+            known_titles.add(title)
+    # در آخر مناسبت‌های آنلاین (فقط اگر چیزی نداشتیم؛ مناسبت‌های خارجی اولویت آخر دارند)
     for item in occasion_cache["online"]:
-        if item["title"] not in known_titles:
+        if item["title"] not in known_titles and len(items) < 6:
             items.append(item)
             known_titles.add(item["title"])
     primary = items[0]["title"] if items else "مناسبت‌های امروز در حال بروزرسانی است"

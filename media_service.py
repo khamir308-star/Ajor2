@@ -1068,11 +1068,17 @@ async def fetch_instagram_metadata(session: aiohttp.ClientSession, url: str) -> 
     """دریافت متادیتای پست/ریلز اینستاگرام از مسیرهای عمومی؛ در صورت شکست dict خالی برمی‌گرداند."""
     safe_url = normalize_instagram_url(url)
     base = safe_url.rstrip("/")
+    # شورت‌کد برای imginn
+    shortcode = ""
+    short_match = re.search(r"/(?:p|reel|tv|stories)/([A-Za-z0-9_-]+)", safe_url)
+    if short_match:
+        shortcode = short_match.group(1)
     candidates = list(dict.fromkeys([
         f"{base}/embed/captioned/",
         f"{base}/embed/",
         f"{base}/?__a=1&__d=dis",
         safe_url,
+        *([f"https://imginn.com/p/{shortcode}/", f"https://imginn.com/{shortcode}/"] if shortcode else []),
     ]))
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
@@ -1090,6 +1096,18 @@ async def fetch_instagram_metadata(session: aiohttp.ClientSession, url: str) -> 
         except (aiohttp.ClientError, asyncio.TimeoutError):
             continue
         parsed = extract_instagram_post_metadata(body)
+        # برای imginn فیلدهای icon-likes/icon-comments را جدا استخراج می‌کنیم
+        if "imginn.com" in candidate and shortcode:
+            likes_m = re.search(r"icon-likes\"?>\s*([\d][\d,.]*[KkMm]?)", body)
+            comments_m = re.search(r"icon-comments\"?>\s*([\d][\d,.]*[KkMm]?)", body)
+            if likes_m:
+                parsed["likes"] = _clean_instagram_count(likes_m.group(1))
+            if comments_m:
+                parsed["comments"] = _clean_instagram_count(comments_m.group(1))
+            if not parsed.get("caption"):
+                desc_m = re.search(r'<meta[^>]+name="description"[^>]+content="([^"]+)"', body, flags=re.I)
+                if desc_m:
+                    parsed["caption"] = html_lib.unescape(desc_m.group(1))[:300]
         score = sum(1 for key in ("caption", "likes", "comments", "views", "username") if parsed.get(key))
         best_score = sum(1 for key in ("caption", "likes", "comments", "views", "username") if best.get(key))
         if score > best_score:
@@ -1111,6 +1129,11 @@ def extract_instagram_profile_image_url(body: str) -> str:
     patterns = [
         r"<meta[^>]+(?:property|name)=[\"']og:image[\"'][^>]+content=[\"']([^\"']+)",
         r"<meta[^>]+content=[\"']([^\"']+)[\"'][^>]+(?:property|name)=[\"']og:image[\"']",
+        # imginn: کلاس avatar
+        r"<img[^>]+class=\"[^\"]*avatar[^\"]*\"[^>]+src=\"([^\"]+)\"",
+        r"<img[^>]+src=\"([^\"]+)\"[^>]+class=\"[^\"]*avatar[^\"]*\"",
+        # imginn: اولین تصویر CDN اینستاگرام
+        r"https://scontent[^\"\s\\']+?\.(?:jpg|webp|png)(?:\?[^\"\s\\']*)?",
     ]
     for pattern in patterns:
         for raw in re.findall(pattern, text, flags=re.I):
@@ -1144,6 +1167,7 @@ async def download_instagram_profile(
     page_candidates = list(dict.fromkeys([
         f"https://www.instagram.com/{username}/",
         f"https://m.instagram.com/{username}/",
+        f"https://imginn.com/{username}/",
     ]))
     for page in page_candidates:
         try:

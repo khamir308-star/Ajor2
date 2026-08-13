@@ -19,6 +19,7 @@ import re
 import time
 import tempfile
 import zipfile
+from collections import deque
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -108,6 +109,7 @@ from media_service import (
     download_audio_track,
     download_direct_file,
     download_social_media,
+    fetch_instagram_metadata,
     inspect_link,
     normalized_host,
     normalize_youtube_url,
@@ -1294,7 +1296,7 @@ REPLY_BUTTON_LABELS: set[str] = {
     "🎬 دانلود یوتیوب", "🧩 API شکلک سفارشی", "🤖 راهنمای برنامه‌نویسان",
     "↩️ ابزارهای ربات", "↩️ پشتیبانی",
     # دانلود
-    "📸 دانلود اینستاگرام", "🎵 دانلود تیک‌تاک", "▶️ دانلود یوتیوب",
+    "📸 دانلود اینستاگرام", "🖼 پروفایل اینستاگرام", "🎵 دانلود تیک‌تاک", "▶️ دانلود یوتیوب",
     "🌐 دانلود سایر شبکه‌ها", "🔗 آپلود فایل از URL", "🛡 بررسی امنیت لینک",
     "💬 کپی متن کامنت اینستاگرام", "🎵 موسیقی", "📋 دانلودهای اخیر", "📊 سهمیه دانلود", "ℹ️ راهنمای دانلود",
     "↩️ مرکز دانلود و آپلود",
@@ -2618,10 +2620,10 @@ def info_reply_menu() -> ReplyKeyboardMarkup:
 
 def media_download_reply_menu() -> ReplyKeyboardMarkup:
     return persistent_keyboard([
-        ["📸 دانلود اینستاگرام", "🎵 دانلود تیک‌تاک"],
-        ["▶️ دانلود یوتیوب", "🌐 دانلود سایر شبکه‌ها"],
-        ["🔗 آپلود فایل از URL", "🛡 بررسی امنیت لینک"],
-        ["💬 کپی متن کامنت اینستاگرام"],
+        ["📸 دانلود اینستاگرام", "🖼 پروفایل اینستاگرام"],
+        ["🎵 دانلود تیک‌تاک", "▶️ دانلود یوتیوب"],
+        ["🌐 دانلود سایر شبکه‌ها", "🔗 آپلود فایل از URL"],
+        ["🛡 بررسی امنیت لینک", "💬 کپی متن کامنت اینستاگرام"],
         ["🎵 موسیقی", "📋 دانلودهای اخیر"],
         ["📊 سهمیه دانلود", "ℹ️ راهنمای دانلود"],
         ["↩️ ابزارهای ربات"],
@@ -4761,11 +4763,39 @@ async def process_media_job(job: dict) -> None:
                 else:
                     item = await download_direct_file(http_session, job["url"], folder, MAX_MEDIA_BYTES)
                 title, items = item.title, [item]
+            # متادیتای عمومی پست/ریلز اینستاگرام (کپشن، لایک، ویو و…) از مسیر embed — بدون ورود
+            instagram_meta: dict = {}
+            if job["mode"] == "social" and "instagram" in normalized_host(str(job.get("url", ""))) and http_session is not None:
+                try:
+                    instagram_meta = await fetch_instagram_metadata(http_session, str(job.get("url", ""))) or {}
+                except Exception as meta_exc:
+                    log.warning("instagram metadata fetch failed: %s", meta_exc)
+                    instagram_meta = {}
+            instagram_info_lines: list[str] = []
+            if instagram_meta.get("username"):
+                instagram_info_lines.append(f"👤 @{instagram_meta['username']}")
+            stat_bits = []
+            if instagram_meta.get("likes"):
+                stat_bits.append(f"❤️ {instagram_meta['likes']} لایک")
+            if instagram_meta.get("views"):
+                stat_bits.append(f"👁 {instagram_meta['views']} بازدید")
+            if instagram_meta.get("comments"):
+                stat_bits.append(f"💬 {instagram_meta['comments']} کامنت")
+            if stat_bits:
+                instagram_info_lines.append(" · ".join(stat_bits))
+            # کپشن پست را برای فلوی «متن پست» و دکمهٔ کپی روی اولین آیتم بگذار
+            if instagram_meta.get("caption") and items and not getattr(items[0], "caption", ""):
+                try:
+                    items[0].caption = instagram_meta["caption"][:2000]
+                except Exception:
+                    pass
             sent_ids = []
             for index, item in enumerate(items, 1):
                 prefix = "🎵" if job["mode"] == "audio" else "📥"
+                info_block = ("\n".join(instagram_info_lines) + "\n") if (index == 1 and instagram_info_lines) else ""
                 caption = (
                     f"{prefix} {title[:180]}\n"
+                    f"{info_block}"
                     f"فایل {index}/{len(items)} · {item.size / 1024 / 1024:.1f} MB\n\n"
                     "⚠️ فقط برای محتوای عمومی و استفاده مجاز/شخصی؛ حقوق صاحب اثر را رعایت کن."
                 )
@@ -16422,9 +16452,21 @@ async def handle_text(message: types.Message):
             "📥 لینک عمومی پست/Reel/Shorts/ویدئو رو بفرست.\n\n"
             "🌍 پلتفرم‌های پشتیبانی‌شده: اینستاگرام، تیک‌تاک، یوتیوب، X، فیسبوک، ردیت، پینترست، تردز، ویمیو، دیلی‌موشن، توییچ، ساندکلود، بندکمپ، VK، OK، روتوب، بیلی‌بیلی، استریمبل، رامبل، آدیسی، آرکایو، کیسک، گوگل‌درایو، دراپ‌باکس و ده‌ها سایت دیگه.\n"
             "🔎 حتی اگه سایت خاصی تو لیست نباشه، تلاش می‌کنم ویدئوش رو پیدا کنم.\n\n"
+            "📊 برای کلیپ/پست اینستاگرام، کپشن، تعداد لایک، بازدید و کامنت هم کنار فایل می‌فرستم.\n"
+            "🖼 برای عکس پروفایل اینستاگرام، دکمهٔ «🖼 پروفایل اینستاگرام» رو بزن.\n\n"
             "🎬 ویدئوهای بزرگ خودکار فشرده‌سازی می‌شن تا قابل ارسال باشن + دکمه استخراج صوت MP3.\n"
             "محتوای خصوصی، نیازمند ورود یا DRM قابل دریافت نیست. /cancel",
             reply_markup=media_download_reply_menu(),
+        )
+    if text == "🖼 پروفایل اینستاگرام":
+        media_request_sessions[user_id] = "social"
+        return await message.answer(
+            "🖼 لینک صفحهٔ پروفایل اینستاگرام رو بفرست؛ مثلاً:\n"
+            "<code>https://www.instagram.com/username/</code>\n\n"
+            "عکس پروفایل پیج‌های عمومی رو بدون نیاز به ورود دریافت می‌کنم. "
+            "پیج‌های خصوصی یا محدود قابل دریافت نیستن.\n"
+            "🎟 هر دریافت، ۱ توکن از سهمیهٔ دانلودت کم می‌کنه. /cancel",
+            parse_mode="HTML", reply_markup=media_download_reply_menu(),
         )
     if text == "🔗 آپلود فایل از URL":
         media_request_sessions[user_id] = "direct"
@@ -16442,6 +16484,8 @@ async def handle_text(message: types.Message):
         return await message.answer(
             "ℹ️ <b>مرکز رسانه</b>\n\n"
             "📸 دانلود: اینستاگرام، تیک‌تاک، یوتیوب، X، فیسبوک، ردیت، دیلی‌موشن، توییچ، ساندکلود، گوگل‌درایو و ده‌ها سایت دیگه؛ فقط لینک عمومی و بدون ورود.\n"
+            "🖼 پروفایل اینستاگرام: لینک صفحهٔ کاربر رو بفرست تا عکس پروفایلش رو بگیرم (فقط پیج عمومی).\n"
+            "📊 کلیپ/پست اینستاگرام: همراه فایل، کپشن، تعداد لایک، بازدید و کامنت هم می‌فرستم.\n"
             f"🔗 آپلود URL: لینک مستقیم هر فایل عمومی تا {media_size_label()}؛ تقریباً هر فرمتی (به‌جز صفحهٔ سایت).\n"
             "🎬 ویدئوهای بزرگ‌تر از سقف، خودکار فشرده‌سازی می‌شن و قابل ارسال می‌شن.\n"
             "🎵 بعد از هر ویدئو، دکمه استخراج صوت MP3 هم داری.\n"
@@ -17977,9 +18021,7 @@ async def miniapp_reminder_delete_api(request: web.Request):
 
 
 async def miniapp_profile_api(request: web.Request):
-    telegram_user = verify_telegram_init_data(request.headers.get("X-Telegram-Init-Data", ""))
-    if not telegram_user:
-        raise web.HTTPUnauthorized(text="Valid Telegram Mini App session required")
+    telegram_user = await require_miniapp_user(request)
     user_id = telegram_user["id"]
     if request.method == "POST":
         try:
@@ -18070,16 +18112,12 @@ async def wallet_snapshot(user_id: int) -> dict:
 
 
 async def miniapp_wallet_api(request: web.Request):
-    telegram_user = verify_telegram_init_data(request.headers.get("X-Telegram-Init-Data", ""))
-    if not telegram_user:
-        raise web.HTTPUnauthorized(text="Valid Telegram Mini App session required")
+    telegram_user = await require_miniapp_user(request)
     return web.json_response({"ok": True, "wallet": await wallet_snapshot(telegram_user["id"])})
 
 
 async def miniapp_wallet_convert_api(request: web.Request):
-    telegram_user = verify_telegram_init_data(request.headers.get("X-Telegram-Init-Data", ""))
-    if not telegram_user:
-        raise web.HTTPUnauthorized(text="Valid Telegram Mini App session required")
+    telegram_user = await require_miniapp_user(request)
     try:
         payload = await request.json(); points = int(payload.get("points", 0))
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
@@ -18104,9 +18142,7 @@ async def miniapp_wallet_convert_api(request: web.Request):
 
 
 async def miniapp_wallet_withdraw_api(request: web.Request):
-    telegram_user = verify_telegram_init_data(request.headers.get("X-Telegram-Init-Data", ""))
-    if not telegram_user:
-        raise web.HTTPUnauthorized(text="Valid Telegram Mini App session required")
+    telegram_user = await require_miniapp_user(request)
     try:
         payload = await request.json(); amount_toman = int(payload.get("amount_toman", 0))
     except (ValueError, TypeError, json.JSONDecodeError) as exc:
@@ -18193,8 +18229,7 @@ def calculate_game_reward(game: str, score: float) -> int:
 
 
 async def miniapp_game_reward_api(request: web.Request):
-    telegram_user = verify_telegram_init_data(request.headers.get("X-Telegram-Init-Data", ""))
-    if not telegram_user: raise web.HTTPUnauthorized(text="Valid Telegram Mini App session required")
+    telegram_user = await require_miniapp_user(request)
     try:
         payload = await request.json(); game = str(payload.get("game", "")); score = float(payload.get("score", 0))
     except (ValueError, TypeError, json.JSONDecodeError) as exc: raise web.HTTPBadRequest(text="Invalid game result") from exc
@@ -18204,11 +18239,18 @@ async def miniapp_game_reward_api(request: web.Request):
     existing = await miniapp_rewards_col.find_one({"_id": reward_id}) or {}
     if int(existing.get("count", 0)) >= 5:
         return web.json_response({"ok": True, "awarded": 0, "limit_reached": True, "wallet": await wallet_snapshot(telegram_user["id"])})
-    user = await users_col.find_one({"_id": telegram_user["id"]}) or {}
-    if user.get("miniapp_reward_date") != day:
-        await users_col.update_one({"_id": telegram_user["id"]}, {"$set": {"miniapp_reward_date": day, "miniapp_reward_today": 0}}, upsert=True)
+    # ریست اتمیک شمارندهٔ روزانه با شرط $ne: فقط اولین درخواستِ روز ریست می‌کند؛
+    # درخواست‌های هم‌زمان به‌جای read-then-write قدیمی، مقدار تازه را از دیتابیس می‌خوانند.
+    reset = await users_col.update_one(
+        {"_id": telegram_user["id"], "miniapp_reward_date": {"$ne": day}},
+        {"$set": {"miniapp_reward_date": day, "miniapp_reward_today": 0}},
+        upsert=True,
+    )
+    if reset.modified_count or reset.upserted_id:
         daily_total = 0
-    else: daily_total = int(user.get("miniapp_reward_today", 0))
+    else:
+        fresh = await users_col.find_one({"_id": telegram_user["id"]}, {"miniapp_reward_today": 1}) or {}
+        daily_total = int(fresh.get("miniapp_reward_today", 0))
     reward = min(reward, max(0, 1000 - daily_total))
     if reward <= 0:
         return web.json_response({"ok": True, "awarded": 0, "daily_limit_reached": True, "wallet": await wallet_snapshot(telegram_user["id"])})
@@ -18223,14 +18265,8 @@ async def miniapp_game_reward_api(request: web.Request):
     return web.json_response({"ok": True, "awarded": reward, "awarded_coins": coin_tx.get("amount", 0), "coins": coin_tx.get("balance", 0), "wallet": await wallet_snapshot(telegram_user["id"])})
 
 
-def telegram_api_user(request: web.Request) -> dict:
-    user = verify_telegram_init_data(request.headers.get("X-Telegram-Init-Data", ""))
-    if not user: raise web.HTTPUnauthorized(text="Valid Telegram Mini App session required")
-    return user
-
-
 async def miniapp_economy_api(request: web.Request):
-    user = telegram_api_user(request); user_id = user["id"]
+    user = await require_miniapp_user(request); user_id = user["id"]
     db_user = await users_col.find_one({"_id": user_id}) or {}
     purchases = await shop_purchases_col.find({"user_id": user_id, "status": "completed"}).to_list(length=100)
     owned = [item["item_id"] for item in purchases]
@@ -18275,7 +18311,7 @@ async def miniapp_gift_redeem_api(request: web.Request):
 
 
 async def miniapp_mission_claim_api(request: web.Request):
-    user = telegram_api_user(request)
+    user = await require_miniapp_user(request)
     try:
         payload = await request.json()
         mission_id = ObjectId(str(payload.get("mission_id", "")))
@@ -18292,8 +18328,12 @@ async def miniapp_mission_claim_api(request: web.Request):
 
 
 async def miniapp_spin_api(request: web.Request):
-    user = telegram_api_user(request); user_id = user["id"]
-    payload = await request.json(); request_id = re.sub(r"[^A-Za-z0-9_-]", "", str(payload.get("request_id", "")))[:64]
+    user = await require_miniapp_user(request); user_id = user["id"]
+    try:
+        payload = await request.json()
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        raise web.HTTPBadRequest(text="Invalid spin request") from exc
+    request_id = re.sub(r"[^A-Za-z0-9_-]", "", str(payload.get("request_id", "")))[:64]
     if len(request_id) < 8: raise web.HTTPBadRequest(text="request_id required")
     spin_id = f"spin:{user_id}:{request_id}"
     old = await wheel_spins_col.find_one({"_id": spin_id})
@@ -18327,7 +18367,11 @@ async def miniapp_spin_api(request: web.Request):
 
 
 async def miniapp_shop_purchase_api(request: web.Request):
-    user = telegram_api_user(request); user_id = user["id"]; payload = await request.json()
+    user = await require_miniapp_user(request); user_id = user["id"]
+    try:
+        payload = await request.json()
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        raise web.HTTPBadRequest(text="Invalid purchase request") from exc
     item_id = str(payload.get("item_id", "")); request_id = re.sub(r"[^A-Za-z0-9_-]", "", str(payload.get("request_id", "")))[:64]
     item = SHOP_CATALOG.get(item_id)
     if not item or len(request_id) < 8: raise web.HTTPBadRequest(text="Invalid purchase")
@@ -18345,7 +18389,7 @@ async def miniapp_shop_purchase_api(request: web.Request):
 
 
 async def miniapp_shop_services_api(request: web.Request):
-    telegram_api_user(request)  # احراز هویت مینیاپ
+    await require_miniapp_user(request)  # احراز هویت + بررسی بن مینیاپ
     try:
         rate = await stars_toman_rate()
     except Exception:
@@ -18368,9 +18412,12 @@ async def miniapp_shop_services_api(request: web.Request):
 
 
 async def miniapp_shop_stars_invoice_api(request: web.Request):
-    user = telegram_api_user(request)
+    user = await require_miniapp_user(request)
     user_id = user["id"]
-    payload = await request.json()
+    try:
+        payload = await request.json()
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        raise web.HTTPBadRequest(text="Invalid invoice request") from exc
     service_type = str(payload.get("service_type", ""))
     try:
         months = int(payload.get("months", 0))
@@ -18378,10 +18425,21 @@ async def miniapp_shop_stars_invoice_api(request: web.Request):
         raise web.HTTPBadRequest(text="Invalid months") from exc
     if service_type not in SERVICE_CATALOG or months not in SERVICE_PLANS:
         raise web.HTTPBadRequest(text="Invalid service")
+    # جلوی اسپم سفارش: اگر همین کاربر برای همین سرویس/پلن در ۱۵ دقیقهٔ اخیر سفارش «created» دارد، همان را استفاده مجدد کن
+    order = None
     try:
-        order = await create_service_order(user_id, service_type, months, "stars")
-    except ValueError as exc:
-        raise web.HTTPBadRequest(text=str(exc)) from exc
+        reuse_cutoff = datetime.now(timezone.utc) - timedelta(minutes=15)
+        order = await service_orders_col.find_one(
+            {"user_id": user_id, "service_type": service_type, "months": months, "payment_method": "stars", "status": "created", "created_at": {"$gte": reuse_cutoff}},
+            sort=[("created_at", -1)],
+        )
+    except Exception:
+        order = None
+    if order is None:
+        try:
+            order = await create_service_order(user_id, service_type, months, "stars")
+        except ValueError as exc:
+            raise web.HTTPBadRequest(text=str(exc)) from exc
     rate = await stars_toman_rate()
     stars = max(1, int(order["final_price"]) // rate)
     title = f"{SERVICE_CATALOG[service_type].get('title', 'سرویس')} — {months} ماهه"
@@ -18403,33 +18461,56 @@ async def miniapp_shop_stars_invoice_api(request: web.Request):
 
 
 async def miniapp_raffle_join_api(request: web.Request):
-    user = telegram_api_user(request); user_id = user["id"]; payload = await request.json()
+    user = await require_miniapp_user(request); user_id = user["id"]
+    try:
+        payload = await request.json()
+    except (ValueError, TypeError, json.JSONDecodeError) as exc:
+        raise web.HTTPBadRequest(text="Invalid raffle request") from exc
     try: raffle_id = ObjectId(str(payload.get("raffle_id")))
     except InvalidId as exc: raise web.HTTPBadRequest(text="Invalid raffle") from exc
     raffle = await raffles_col.find_one({"_id": raffle_id, "status": "active", "ends_at": {"$gt": datetime.now(timezone.utc)}})
     if not raffle: raise web.HTTPNotFound(text="Raffle unavailable")
-    count = await raffle_entries_col.count_documents({"raffle_id": raffle_id, "user_id": user_id})
-    if count >= int(raffle.get("max_entries_per_user", 5)): raise web.HTTPForbidden(text="Entry limit reached")
-    entry_id = f"raffle:{raffle_id}:{user_id}:{count+1}"
+    max_entries = int(raffle.get("max_entries_per_user", 5))
+    # ثبت اتمیک جایگاه ورودی قبل از کسر سکه؛ درخواست‌های هم‌زمان روی شمارهٔ بعدی رقابت می‌کنند
+    entry_id = None
+    for _ in range(3):
+        count = await raffle_entries_col.count_documents({"raffle_id": raffle_id, "user_id": user_id})
+        if count >= max_entries: raise web.HTTPForbidden(text="Entry limit reached")
+        candidate = f"raffle:{raffle_id}:{user_id}:{count + 1}"
+        try:
+            await raffle_entries_col.insert_one({"_id": candidate, "raffle_id": raffle_id, "user_id": user_id, "created_at": datetime.now(timezone.utc)})
+            entry_id = candidate
+            break
+        except DuplicateKeyError:
+            continue  # درخواست موازی همان جایگاه را گرفت؛ دوباره تلاش کن
+    if entry_id is None: raise web.HTTPConflict(text="Entry already processing")
+    entries_count = int(entry_id.rsplit(":", 1)[-1])
     spend = await apply_coin_transaction(user_id, -int(raffle["cost"]), "raffle_entry", f"coin:{entry_id}", {"raffle_id": str(raffle_id)})
-    if not spend.get("ok"): raise web.HTTPPaymentRequired(text="Not enough coins")
-    try: await raffle_entries_col.insert_one({"_id": entry_id, "raffle_id": raffle_id, "user_id": user_id, "created_at": datetime.now(timezone.utc)})
-    except DuplicateKeyError: pass
+    if not spend.get("ok"):
+        await raffle_entries_col.delete_one({"_id": entry_id})  # آزادسازی جایگاه؛ سکه‌ای کسر نشده
+        raise web.HTTPPaymentRequired(text="Not enough coins")
     await raffles_col.update_one({"_id": raffle_id}, {"$inc": {"entries": 1, "pool": int(raffle["cost"])}})
-    return web.json_response({"ok": True, "entries": count + 1, "coins": await coin_balance(user_id)})
+    return web.json_response({"ok": True, "entries": entries_count, "coins": await coin_balance(user_id)})
 
 
 async def miniapp_prediction_bet_api(request: web.Request):
-    user = telegram_api_user(request); user_id = user["id"]; payload = await request.json()
+    user = await require_miniapp_user(request); user_id = user["id"]; payload = await request.json()
     try: prediction_id = ObjectId(str(payload.get("prediction_id"))); option = int(payload.get("option")); stake = int(payload.get("stake", 20))
     except (InvalidId, ValueError, TypeError) as exc: raise web.HTTPBadRequest(text="Invalid prediction") from exc
     prediction = await predictions_col.find_one({"_id": prediction_id, "status": "active", "ends_at": {"$gt": datetime.now(timezone.utc)}})
     if not prediction or option < 0 or option >= len(prediction["options"]) or stake not in {10, 20, 50, 100}: raise web.HTTPBadRequest(text="Invalid bet")
     bet_id = f"prediction:{prediction_id}:{user_id}"
-    if await prediction_bets_col.find_one({"_id": bet_id}): raise web.HTTPConflict(text="Already predicted")
+    # ایدمپوتنسی اتمیک: اول خود رأی را با کلید یکتا ثبت می‌کنیم تا درخواست‌های موازی/تکراری
+    # (دابل‌کلیک، retry شبکه) هرگز دوبار سکه کسر نکنند؛ کسر سکه فقط بعد از ثبت موفق انجام می‌شود.
+    try:
+        await prediction_bets_col.insert_one({"_id": bet_id, "prediction_id": prediction_id, "user_id": user_id, "option": option, "stake": stake, "created_at": datetime.now(timezone.utc), "status": "open"})
+    except DuplicateKeyError:
+        raise web.HTTPConflict(text="Already predicted") from None
     spend = await apply_coin_transaction(user_id, -stake, "prediction_stake", f"coin:{bet_id}:stake", {"prediction_id": str(prediction_id), "option": option})
-    if not spend.get("ok"): raise web.HTTPPaymentRequired(text="Not enough coins")
-    await prediction_bets_col.insert_one({"_id": bet_id, "prediction_id": prediction_id, "user_id": user_id, "option": option, "stake": stake, "created_at": datetime.now(timezone.utc), "status": "open"})
+    if not spend.get("ok"):
+        # سکه کافی نبود؛ رأی ثبت‌شده را برمی‌گردانیم تا کاربر بعداً بتواند دوباره تلاش کند
+        await prediction_bets_col.delete_one({"_id": bet_id})
+        raise web.HTTPPaymentRequired(text="Not enough coins")
     await predictions_col.update_one({"_id": prediction_id}, {"$inc": {f"option_pools.{option}": stake, "pool": stake}})
     return web.json_response({"ok": True, "coins": await coin_balance(user_id)})
 
@@ -18824,9 +18905,7 @@ async def miniapp_reviews_api(request: web.Request):
 
 
 async def miniapp_support_api(request: web.Request):
-    telegram_user = verify_telegram_init_data(request.headers.get("X-Telegram-Init-Data", ""))
-    if not telegram_user:
-        raise web.HTTPUnauthorized(text="Valid Telegram Mini App session required")
+    telegram_user = await require_miniapp_user(request)
     try:
         payload = await request.json()
     except Exception as exc:
@@ -18916,6 +18995,48 @@ async def security_headers_middleware(request: web.Request, handler):
     if raised_exception:
         raise response
     return response
+
+
+# ===== ریت‌لیمیت APIهای مینیاپ (ضد اسپم/بروت‌فورس؛ کلید = کاربر تأییدشده وگرنه IP) =====
+API_RATE_WINDOW_SECONDS = 60
+API_RATE_MAX_REQUESTS = 120
+_api_rate_hits: dict[str, "deque[float]"] = {}
+
+
+def _api_rate_key(request: web.Request) -> str:
+    raw = request.headers.get("X-Telegram-Init-Data", "")
+    if raw:
+        user = verify_telegram_init_data(raw)
+        if user:
+            return f"u:{user['id']}"
+    return f"ip:{request.remote or 'unknown'}"
+
+
+@web.middleware
+async def api_rate_limit_middleware(request: web.Request, handler):
+    if not request.path.startswith("/api/"):
+        return await handler(request)
+    now = time.time()
+    key = _api_rate_key(request)
+    hits = _api_rate_hits.get(key)
+    if hits is None:
+        hits = _api_rate_hits[key] = deque()
+    cutoff = now - API_RATE_WINDOW_SECONDS
+    while hits and hits[0] < cutoff:
+        hits.popleft()
+    if len(hits) >= API_RATE_MAX_REQUESTS:
+        retry_after = max(1, int(hits[0] + API_RATE_WINDOW_SECONDS - now) + 1)
+        raise web.HTTPTooManyRequests(
+            text=json.dumps({"ok": False, "message": "درخواست‌ها زیاد شد؛ چند لحظه صبر کن."}, ensure_ascii=False),
+            content_type="application/json",
+            headers={"Retry-After": str(retry_after)},
+        )
+    hits.append(now)
+    if len(_api_rate_hits) > 20_000:  # پاکسازی سبک کلیدهای قدیمی برای جلوگیری از رشد حافظه
+        stale = [k for k, dq in _api_rate_hits.items() if not dq or dq[-1] < cutoff]
+        for k in stale[:10_000]:
+            _api_rate_hits.pop(k, None)
+    return await handler(request)
 
 
 async def google_site_verification(request: web.Request):
@@ -19057,7 +19178,7 @@ async def main():
     try:
         app = web.Application(
             client_max_size=2 * 1024 * 1024,
-            middlewares=[security_headers_middleware],
+            middlewares=[api_rate_limit_middleware, security_headers_middleware],
         )
         app.router.add_get("/", root_landing)
         app.router.add_get("/health", health_check)

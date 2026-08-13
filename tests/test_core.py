@@ -43,7 +43,11 @@ from instagram_comment_service import (
 from media_service import (
     MediaServiceError,
     classify_social_download_error,
+    extract_instagram_post_metadata,
+    extract_instagram_profile_image_url,
     extract_instagram_public_media_urls,
+    instagram_username_from_url,
+    is_instagram_profile_url,
     is_instagram_public_url,
     is_social_url,
     looks_like_hls_manifest,
@@ -441,8 +445,10 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(ts.normalize_city("تهران"), "Tehran")
         self.assertEqual(ts._parse_crypto_symbol("بیت‌کوین"), "bitcoin")
         self.assertEqual(ts._parse_currency("تومان"), "IRR")
-        # بررسی امنیت رمز (محلی — بدون شبکه)
+        # بررسی امنیت رمز (HIBP range API — فقط پیشوند هش ارسال می‌شود)
         count = ts.pwned_password_count("this-is-a-unique-test-password-xyz-12345")
+        if count == -1:
+            self.skipTest("Pwned Passwords API در این محیط در دسترس نیست")
         self.assertEqual(count, 0)
         # دکمه پست خودکار در پنل
         admin = bot.admin_menu()
@@ -1202,6 +1208,50 @@ class CoreTests(unittest.TestCase):
         self.assertTrue(bot.DIRECT_MEDIA_URL_RE.match("https://cdn.site.com/app.apk"))
         self.assertIsNone(bot.DIRECT_MEDIA_URL_RE.match("https://site.com/watch?v=abc"))
 
+    def test_instagram_profile_url_detection(self):
+        # لینک‌های پروفایل معتبر
+        self.assertTrue(is_instagram_profile_url("https://www.instagram.com/someuser/"))
+        self.assertTrue(is_instagram_profile_url("https://instagram.com/user.name_1"))
+        self.assertTrue(is_instagram_profile_url("https://m.instagram.com/abc123/?utm_source=ig"))
+        # مسیرهای محتوا و رزروشده پروفایل نیستند
+        self.assertFalse(is_instagram_profile_url("https://www.instagram.com/p/AbC123xyz/"))
+        self.assertFalse(is_instagram_profile_url("https://www.instagram.com/reel/AbC123xyz/"))
+        self.assertFalse(is_instagram_profile_url("https://www.instagram.com/stories/user/123/"))
+        self.assertFalse(is_instagram_profile_url("https://www.instagram.com/explore/"))
+        self.assertFalse(is_instagram_profile_url("https://www.instagram.com/"))
+        self.assertFalse(is_instagram_profile_url("https://example.com/someuser/"))
+        self.assertEqual(instagram_username_from_url("https://www.instagram.com/Ajor_pareh/?x=1"), "Ajor_pareh")
+
+    def test_instagram_post_metadata_extraction(self):
+        body = (
+            '<meta property="og:description" content="1,234 likes, 56 comments - کپشن تستی این پست اینستاگرام">'
+            '<div class="Caption"><a class="CaptionUsername">@testuser</a>کپشن داخل embed</div>'
+            '"video_view_count": 98765'
+        )
+        meta = extract_instagram_post_metadata(body)
+        self.assertEqual(meta["likes"], "1,234")
+        self.assertEqual(meta["comments"], "56")
+        self.assertEqual(meta["views"], "98765")
+        self.assertIn("کپشن تستی", meta["caption"])
+        self.assertEqual(meta["username"], "testuser")
+        # بدنهٔ خالی → dict خالی بدون خطا
+        empty = extract_instagram_post_metadata("")
+        self.assertEqual(empty, {"caption": "", "likes": "", "comments": "", "views": "", "username": ""})
+
+    def test_instagram_profile_image_url_only_allows_cdn_hosts(self):
+        good = '<meta property="og:image" content="https://scontent.cdninstagram.com/v/t51/x.jpg">'
+        self.assertTrue(extract_instagram_profile_image_url(good).startswith("https://scontent.cdninstagram.com"))
+        # og:image جعلی به میزبان غیرمجاز نباید قبول شود (جلوگیری از SSRF)
+        evil = '<meta property="og:image" content="https://evil.example.com/steal.jpg">'
+        self.assertEqual(extract_instagram_profile_image_url(evil), "")
+        internal = '<meta property="og:image" content="http://127.0.0.1/x.jpg">'
+        self.assertEqual(extract_instagram_profile_image_url(internal), "")
+
+    def test_instagram_profile_button_in_media_menu(self):
+        texts = [b.text for row in bot.media_download_reply_menu().keyboard for b in row]
+        self.assertIn("🖼 پروفایل اینستاگرام", texts)
+        self.assertIn("📸 دانلود اینستاگرام", texts)
+
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg is installed in the Railway Docker image")
     def test_compress_video_to_fit_and_audio_extraction(self):
         from media_service import compress_video_to_fit
@@ -1592,6 +1642,116 @@ class AsyncCoreTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("default-src 'self'", response.headers.get("Content-Security-Policy", ""))
         finally:
             await client.close()
+
+    @staticmethod
+    def _signed_init_data(user_id=42):
+        pairs = {
+            "auth_date": str(int(time.time())),
+            "query_id": "test-query",
+            "user": json.dumps({"id": user_id, "first_name": "Test"}, separators=(",", ":")),
+        }
+        check_string = "\n".join(f"{key}={value}" for key, value in sorted(pairs.items()))
+        secret = hmac.new(b"WebAppData", bot.TOKEN.encode(), hashlib.sha256).digest()
+        pairs["hash"] = hmac.new(secret, check_string.encode(), hashlib.sha256).hexdigest()
+        return urlencode(pairs)
+
+    async def test_api_rate_limit_blocks_excessive_requests(self):
+        async def dummy(request):
+            return web.json_response({"ok": True})
+
+        app = web.Application(middlewares=[bot.api_rate_limit_middleware])
+        app.router.add_get("/api/dummy", dummy)
+        app.router.add_get("/other", dummy)
+        original_max = bot.API_RATE_MAX_REQUESTS
+        bot.API_RATE_MAX_REQUESTS = 5
+        bot._api_rate_hits.clear()
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        try:
+            statuses = []
+            for _ in range(7):
+                response = await client.get("/api/dummy")
+                statuses.append(response.status)
+            self.assertEqual(statuses[:5], [200] * 5)
+            self.assertEqual(statuses[5:], [429, 429])
+            limited = await client.get("/api/dummy")
+            self.assertIn("Retry-After", limited.headers)
+            # مسیرهای غیر API محدود نمی‌شوند
+            other = await client.get("/other")
+            self.assertEqual(other.status, 200)
+        finally:
+            await client.close()
+            bot.API_RATE_MAX_REQUESTS = original_max
+            bot._api_rate_hits.clear()
+
+    async def test_economy_endpoints_reject_missing_init_data(self):
+        app = web.Application(middlewares=[bot.api_rate_limit_middleware])
+        app.router.add_post("/api/spin", bot.miniapp_spin_api)
+        app.router.add_post("/api/prediction/bet", bot.miniapp_prediction_bet_api)
+        app.router.add_post("/api/raffle/join", bot.miniapp_raffle_join_api)
+        app.router.add_post("/api/shop/purchase", bot.miniapp_shop_purchase_api)
+        app.router.add_post("/api/wallet/convert", bot.miniapp_wallet_convert_api)
+        app.router.add_get("/api/economy", bot.miniapp_economy_api)
+        bot._api_rate_hits.clear()
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        try:
+            for path in ("/api/spin", "/api/prediction/bet", "/api/raffle/join", "/api/shop/purchase", "/api/wallet/convert"):
+                response = await client.post(path, json={})
+                self.assertEqual(response.status, 401, path)
+            response = await client.get("/api/economy")
+            self.assertEqual(response.status, 401)
+        finally:
+            await client.close()
+            bot._api_rate_hits.clear()
+
+    async def test_banned_user_is_blocked_on_miniapp_wallet_api(self):
+        class FakeBanUsers:
+            def __init__(self, doc):
+                self.doc = doc
+
+            async def find_one(self, query, *args, **kwargs):
+                return dict(self.doc) if self.doc else None
+
+            async def update_one(self, *args, **kwargs):
+                class _R:
+                    modified_count = 1
+                    upserted_id = None
+
+                return _R()
+
+        app = web.Application(middlewares=[bot.api_rate_limit_middleware])
+        app.router.add_get("/api/wallet", bot.miniapp_wallet_api)
+        bot._api_rate_hits.clear()
+        original_users = bot.users_col
+        bot.users_col = FakeBanUsers({"_id": 42, "is_banned": True})
+        client = TestClient(TestServer(app))
+        await client.start_server()
+        try:
+            init_data = self._signed_init_data(42)
+            response = await client.get("/api/wallet", headers={"X-Telegram-Init-Data": init_data})
+            self.assertEqual(response.status, 403)  # کاربر بن‌شده حتی با initData معتبر رد می‌شود
+        finally:
+            await client.close()
+            bot.users_col = original_users
+            bot._api_rate_hits.clear()
+
+    def test_game_scripts_are_lazy_loaded_and_double_submit_guarded(self):
+        index = Path("webapp/index.html").read_text()
+        app_js = Path("webapp/app.js").read_text()
+        sw_js = Path("webapp/sw.js").read_text()
+        # اسکریپت‌های بازی دیگر eager در index لود نمی‌شوند (code-splitting برای LCP)
+        for src in ("hokm.js", "boardgames.js", "ajorchin.js", "snake.js"):
+            self.assertNotIn(f'src="{src}', index)
+        self.assertIn("GAME_SCRIPTS", app_js)
+        self.assertIn("loadGameScript", app_js)
+        # دکمهٔ بازگشت بومی تلگرام برای زیرصفحه‌ها فعال است
+        self.assertIn("BackButton", app_js)
+        self.assertIn("SUB_PAGES", app_js)
+        # محافظ double-request روی پرداخت ستاره و دکمه‌های اقتصادی
+        self.assertIn('dataset.busy', app_js)
+        # کش سرویس‌ورکر با نسخه‌های جدید همگام است
+        self.assertIn("hokm.js?v=2-lazy", sw_js)
 
     async def test_private_url_is_rejected(self):
         with self.assertRaises(MediaServiceError):

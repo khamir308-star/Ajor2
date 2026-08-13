@@ -391,6 +391,46 @@ def is_instagram_public_url(url: str) -> bool:
     )
 
 
+# مسیرهای سیستمی اینستاگرام که نام کاربری نیستند
+INSTAGRAM_RESERVED_PATHS = {
+    "p", "reel", "reels", "tv", "stories", "accounts", "explore", "about",
+    "developer", "directory", "legal", "privacy", "terms", "help", "challenge",
+    "two_factor", "create", "web", "api", "graphql", "download", "embed",
+}
+
+INSTAGRAM_PROFILE_RE = re.compile(
+    r"^/(?:([A-Za-z0-9._]{1,30}))/?(?:[?#].*)?$"
+)
+
+
+def is_instagram_profile_url(url: str) -> bool:
+    """لینک صفحهٔ پروفایل عمومی اینستاگرام مثل instagram.com/username/"""
+    host = normalized_host(url)
+    if host not in {"instagram.com", "www.instagram.com", "m.instagram.com"}:
+        return False
+    try:
+        path = urlparse(str(url or "").strip()).path or "/"
+    except ValueError:
+        return False
+    match = INSTAGRAM_PROFILE_RE.match(path)
+    if not match:
+        return False
+    username = match.group(1).lower()
+    if username in INSTAGRAM_RESERVED_PATHS:
+        return False
+    # نام کاربری معتبر اینستاگرام: حداقل ۲ کاراکتر و شروع/پایان با نقطه ممنوع
+    return len(username) >= 2 and not username.startswith(".") and not username.endswith(".")
+
+
+def instagram_username_from_url(url: str) -> str:
+    try:
+        path = urlparse(str(url or "").strip()).path or "/"
+    except ValueError:
+        return ""
+    match = INSTAGRAM_PROFILE_RE.match(path)
+    return match.group(1) if match else ""
+
+
 def is_social_url(url: str) -> bool:
     host = normalized_host(normalize_youtube_url(url))
     return bool(host and host_matches(host, SUPPORTED_SOCIAL_DOMAINS))
@@ -959,6 +999,201 @@ def extract_instagram_public_media_urls(body: str) -> list[str]:
     return urls[:12]
 
 
+def _clean_instagram_count(value: str) -> str:
+    """اعداد مثل 1,234 یا 12.5K را به‌صورت متن مرتب برمی‌گرداند."""
+    return re.sub(r"\s+", "", str(value or "")).strip()
+
+
+def extract_instagram_post_metadata(body: str) -> dict:
+    """استخراج کپشن/لایک/کامنت/ویو/نام کاربری از صفحهٔ embed یا پست عمومی اینستاگرام (بدون ورود)."""
+    text = html_lib.unescape(str(body or ""))
+    meta: dict = {"caption": "", "likes": "", "comments": "", "views": "", "username": ""}
+    if not text:
+        return meta
+
+    # og:description معمولاً این قالب را دارد: "1,234 likes, 45 comments - متن کپشن..."
+    og_desc = ""
+    desc_match = re.search(
+        r"<meta[^>]+(?:property|name)=[\"']og:description[\"'][^>]+content=[\"']([^\"']*)",
+        text, flags=re.I,
+    ) or re.search(
+        r"<meta[^>]+content=[\"']([^\"']*)[\"'][^>]+(?:property|name)=[\"']og:description[\"']",
+        text, flags=re.I,
+    )
+    if desc_match:
+        og_desc = html_lib.unescape(desc_match.group(1)).strip()
+
+    likes_match = re.search(r"([\d][\d,.]*[KkMm]?)\s+likes?", og_desc or text, flags=re.I)
+    if likes_match:
+        meta["likes"] = _clean_instagram_count(likes_match.group(1))
+    comments_match = re.search(r"([\d][\d,.]*[KkMm]?)\s+comments?", og_desc or text, flags=re.I)
+    if comments_match:
+        meta["comments"] = _clean_instagram_count(comments_match.group(1))
+    views_match = (
+        re.search(r"\"(?:video_view_count|view_count|viewCount)\"\s*:\s*(\d+)", text)
+        or re.search(r"([\d][\d,.]*[KkMm]?)\s+views?", text, flags=re.I)
+    )
+    if views_match:
+        meta["views"] = _clean_instagram_count(views_match.group(1))
+
+    if og_desc:
+        caption_part = re.split(r"\s+-\s+", og_desc, maxsplit=1)
+        if len(caption_part) == 2 and likes_match:
+            meta["caption"] = caption_part[1].strip()
+        elif not likes_match:
+            meta["caption"] = og_desc
+
+    # کپشن داخل embed captioned
+    if not meta["caption"]:
+        caption_block = re.search(
+            r"<div[^>]+class=\"Caption\"[^>]*>(.*?)</div>", text, flags=re.I | re.S,
+        )
+        if caption_block:
+            cleaned = re.sub(r"<[^>]+>", "", caption_block.group(1))
+            cleaned = html_lib.unescape(cleaned)
+            cleaned = re.sub(r"\s+", " ", cleaned).strip()
+            meta["caption"] = cleaned
+
+    user_match = (
+        re.search(r"class=\"CaptionUsername\"[^>]*>([^<]+)<", text, flags=re.I)
+        or re.search(r"\"username\"\s*:\s*\"([A-Za-z0-9._]{1,30})\"", text)
+        or re.search(r"<meta[^>]+(?:property|name)=[\"']og:title[\"'][^>]+content=[\"']@?([A-Za-z0-9._]{1,30})\s+on", text, flags=re.I)
+    )
+    if user_match:
+        meta["username"] = user_match.group(1).strip().lstrip("@")
+    return meta
+
+
+async def fetch_instagram_metadata(session: aiohttp.ClientSession, url: str) -> dict:
+    """دریافت متادیتای پست/ریلز اینستاگرام از مسیرهای عمومی؛ در صورت شکست dict خالی برمی‌گرداند."""
+    safe_url = normalize_instagram_url(url)
+    base = safe_url.rstrip("/")
+    candidates = list(dict.fromkeys([
+        f"{base}/embed/captioned/",
+        f"{base}/embed/",
+        f"{base}/?__a=1&__d=dis",
+        safe_url,
+    ]))
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.8",
+        "Referer": "https://www.instagram.com/",
+    }
+    best: dict = {}
+    for candidate in candidates:
+        try:
+            async with session.get(candidate, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as response:
+                if response.status != 200:
+                    continue
+                body = await response.text(errors="ignore")
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            continue
+        parsed = extract_instagram_post_metadata(body)
+        score = sum(1 for key in ("caption", "likes", "comments", "views", "username") if parsed.get(key))
+        best_score = sum(1 for key in ("caption", "likes", "comments", "views", "username") if best.get(key))
+        if score > best_score:
+            best = parsed
+        if best.get("caption") and best.get("likes"):
+            break
+    return best
+
+
+# میزبان‌های CDN عمومی مجاز برای عکس پروفایل اینستاگرام (جلوگیری از SSRF از طریق og:image جعلی)
+INSTAGRAM_CDN_HOST_SUFFIXES = (
+    ".cdninstagram.com", ".fbcdn.net", ".fbsbx.com", ".instagram.com",
+)
+
+
+def extract_instagram_profile_image_url(body: str) -> str:
+    """URL عکس پروفایل را از og:image/meta صفحهٔ عمومی استخراج می‌کند."""
+    text = html_lib.unescape(str(body or ""))
+    patterns = [
+        r"<meta[^>]+(?:property|name)=[\"']og:image[\"'][^>]+content=[\"']([^\"']+)",
+        r"<meta[^>]+content=[\"']([^\"']+)[\"'][^>]+(?:property|name)=[\"']og:image[\"']",
+    ]
+    for pattern in patterns:
+        for raw in re.findall(pattern, text, flags=re.I):
+            candidate = html_lib.unescape(str(raw)).replace("\\/", "/").replace("\\u0026", "&")
+            if not candidate.lower().startswith("https://"):
+                continue
+            host = (urlparse(candidate).hostname or "").lower()
+            if host and any(host == suffix[1:] or host.endswith(suffix) for suffix in INSTAGRAM_CDN_HOST_SUFFIXES):
+                return candidate
+    return ""
+
+
+async def download_instagram_profile(
+    session: aiohttp.ClientSession,
+    url: str,
+    output_dir: str,
+    max_bytes: int = 25 * 1024 * 1024,
+) -> tuple[str, list["DownloadedMedia"]]:
+    """دانلود عکس پروفایل اینستاگرام از مسیر کاملاً عمومی (og:image) — بدون کوکی یا ورود."""
+    safe_url = str(url or "").strip()
+    if not is_instagram_profile_url(safe_url):
+        raise MediaServiceError("invalid_url", "این لینک پروفایل عمومی اینستاگرام نیست.")
+    username = instagram_username_from_url(safe_url)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.8",
+        "Referer": "https://www.instagram.com/",
+    }
+    image_url = ""
+    page_candidates = list(dict.fromkeys([
+        f"https://www.instagram.com/{username}/",
+        f"https://m.instagram.com/{username}/",
+    ]))
+    for page in page_candidates:
+        try:
+            async with session.get(page, headers=headers, timeout=aiohttp.ClientTimeout(total=25)) as response:
+                if response.status != 200:
+                    continue
+                body = await response.text(errors="ignore")
+        except (aiohttp.ClientError, asyncio.TimeoutError):
+            continue
+        image_url = extract_instagram_profile_image_url(body)
+        if image_url:
+            break
+    if not image_url:
+        raise MediaServiceError(
+            "private_or_restricted",
+            "عکس پروفایل این کاربر از مسیر عمومی قابل دریافت نیست؛ احتمالاً پیج خصوصی است یا اینستاگرام صفحه را بدون ورود نشان نمی‌دهد.",
+        )
+    folder = Path(output_dir)
+    folder.mkdir(parents=True, exist_ok=True)
+    output_path = folder / f"instagram_profile_{safe_filename(username, 'profile')}.jpg"
+    downloaded = 0
+    try:
+        async with session.get(image_url, headers={"User-Agent": headers["User-Agent"], "Referer": "https://www.instagram.com/"}, timeout=aiohttp.ClientTimeout(total=60)) as response:
+            if response.status != 200:
+                raise MediaServiceError("download_failed", "CDN اینستاگرام عکس پروفایل را نفرستاد.")
+            with open(output_path, "wb") as handle:
+                async for chunk in response.content.iter_chunked(256 * 1024):
+                    downloaded += len(chunk)
+                    if downloaded > max_bytes:
+                        raise MediaServiceError("too_large_or_empty", "عکس پروفایل غیرعادی بزرگ است.")
+                    handle.write(chunk)
+    except aiohttp.ClientError as exc:
+        raise MediaServiceError("download_failed", "دریافت عکس پروفایل از CDN اینستاگرام ناموفق بود.") from exc
+    if not output_path.exists() or output_path.stat().st_size == 0:
+        raise MediaServiceError("too_large_or_empty", "عکس پروفایل خالی دریافت شد.")
+    size = output_path.stat().st_size
+    title = f"پروفایل اینستاگرام @{username}"
+    item = DownloadedMedia(
+        path=str(output_path),
+        filename=output_path.name,
+        mime_type="image/jpeg",
+        size=size,
+        title=title,
+        kind="photo",
+        caption="",
+        description=f"instagram_profile:{username}",
+    )
+    return title, [item]
+
+
 async def _download_instagram_public_fallback(
     session: aiohttp.ClientSession,
     url: str,
@@ -1281,6 +1516,16 @@ async def _managed_instagram_provider(
 async def download_social_media(url: str, output_dir: str, max_bytes: int = MAX_MEDIA_BYTES, progress_callback=None) -> tuple[str, list[DownloadedMedia]]:
     # allow_generic: هر دامنهٔ عمومی که ویدئو داشته باشد تلاش می‌شود (نه فقط شبکه‌های معروف)
     safe_url = normalize_instagram_url(normalize_youtube_url(await validate_public_url(url, social_only=True, allow_generic=True)))
+    # عکس پروفایل اینستاگرام مسیر اختصاصی خودش را دارد (og:image عمومی؛ بدون ورود به موتور ویدئو)
+    if is_instagram_profile_url(safe_url):
+        profile_session = aiohttp.ClientSession(
+            cookie_jar=aiohttp.DummyCookieJar(),
+            timeout=aiohttp.ClientTimeout(total=90),
+        )
+        try:
+            return await download_instagram_profile(profile_session, safe_url, output_dir, min(max_bytes, 25 * 1024 * 1024))
+        finally:
+            await profile_session.close()
     try:
         return await asyncio.to_thread(_social_download_sync, safe_url, output_dir, max_bytes, progress_callback)
     except MediaServiceError as exc:

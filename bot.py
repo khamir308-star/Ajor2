@@ -2231,6 +2231,12 @@ async def execute_ai_text_mode(message: types.Message, session_data: dict, text:
 
 async def download_telegram_photo(message: types.Message) -> bytes:
     telegram_file = await bot.get_file(message.photo[-1].file_id)
+    # در حالت سرور لوکال Bot API، file_path مطلق (مثل /tmp/tgapi/...) است
+    # و دانلود از طریق HTTP کار نمی‌کند؛ مستقیم از دیسک خوانده می‌شود.
+    if LOCAL_BOT_API and telegram_file.file_path and str(telegram_file.file_path).startswith("/"):
+        local_path = Path(str(telegram_file.file_path))
+        if local_path.exists():
+            return local_path.read_bytes()
     output = io.BytesIO()
     await bot.download_file(telegram_file.file_path, destination=output)
     return output.getvalue()
@@ -2238,6 +2244,10 @@ async def download_telegram_photo(message: types.Message) -> bytes:
 
 async def download_telegram_media(file_id: str) -> bytes:
     telegram_file = await bot.get_file(file_id)
+    if LOCAL_BOT_API and telegram_file.file_path and str(telegram_file.file_path).startswith("/"):
+        local_path = Path(str(telegram_file.file_path))
+        if local_path.exists():
+            return local_path.read_bytes()
     output = io.BytesIO()
     await bot.download_file(telegram_file.file_path, destination=output)
     return output.getvalue()
@@ -15625,7 +15635,10 @@ async def _edit_prompt_detail(callback: types.CallbackQuery, item: dict) -> None
     )
     rows = [[InlineKeyboardButton(text="📋 ارسال نسخهٔ قابل‌کپی", callback_data=f"promptcopy:{item['id']}")]]
     if item["category"] in {"image", "edit"}:
-        rows.append([InlineKeyboardButton(text="🎨 آماده‌سازی برای ساخت تصویر", callback_data=f"promptuse:{item['id']}")])
+        rows.append([
+            InlineKeyboardButton(text="🖼 ساخت تصویر با این پرامپت", callback_data=f"promptgen:{item['id']}"),
+            InlineKeyboardButton(text="🎨 آماده‌سازی برای ویرایش عکس", callback_data=f"promptuse:{item['id']}"),
+        ])
     if len(items) > 1:
         rows.append([
             InlineKeyboardButton(
@@ -15692,6 +15705,61 @@ async def prompt_copy_callback(callback: types.CallbackQuery):
         return await callback.answer("پرامپت پیدا نشد.", show_alert=True)
     await callback.message.answer(f"📋 <b>نسخهٔ قابل‌کپی:</b>\n\n<pre>{html.escape(item['prompt'])}</pre>", parse_mode="HTML")
     await callback.answer("ارسال شد ✅")
+
+
+@dp.callback_query(F.data.startswith("promptgen:"))
+async def prompt_generate_image_callback(callback: types.CallbackQuery):
+    """ساخت مستقیم تصویر با پرامپت کتابخانه (بدون نیاز به کپی یا عکس مرجع)."""
+    item = _prompt_by_id(callback.data.split(":", 1)[1])
+    if not item:
+        return await callback.answer("پرامپت پیدا نشد.", show_alert=True)
+    user_id = callback.from_user.id
+    prompt = str(item.get("prompt") or "").strip()
+    if not prompt:
+        return await callback.answer("این پرامپت متنی برای ساخت تصویر ندارد.", show_alert=True)
+    profanity = detect_profanity(prompt)
+    if profanity:
+        return await issue_private_warning(callback.message, profanity)
+    lock = ai_request_lock(user_id)
+    if lock.locked():
+        return await callback.answer("⏳ درخواست قبلیت هنوز در حال پردازشه؛ چند ثانیه صبر کن.", show_alert=True)
+    await callback.answer("🎨 شروع ساخت تصویر...")
+    ai_sessions.pop(user_id, None)
+    prompt_image_sessions.pop(user_id, None)
+    async with lock:
+        waiting = await callback.message.answer(
+            f"🖼 <b>در حال ساخت تصویر با پرامپت:</b>\n<pre>{html.escape(prompt[:300])}</pre>",
+            parse_mode="HTML",
+        )
+        await bot.send_chat_action(callback.message.chat.id, "upload_photo")
+        result = await ai_service.generate_image(
+            prompt,
+            user_id=user_id,
+            unlimited=is_admin(user_id),
+        )
+        try:
+            await waiting.delete()
+        except TelegramBadRequest:
+            pass
+        if not result.ok or not result.image:
+            return await callback.message.answer(
+                ai_error_text(result.reason, image=True), reply_markup=ai_reply_menu()
+            )
+        extension = "jpg" if "jpeg" in result.mime_type else "webp" if "webp" in result.mime_type else "png"
+        upload = BufferedInputFile(result.image, filename=f"ajorpareh-prompt-{item['id']}.{extension}")
+        caption = f"🖼 تصویر ساخته‌شده با پرامپت «{html.escape(item['title'])}»"
+        if result.caption:
+            caption += f"\n\n{result.caption[:800]}"
+        if len(result.image) <= 9_500_000:
+            await callback.message.answer_photo(upload, caption=caption[:1024], reply_markup=ai_reply_menu())
+        else:
+            await callback.message.answer_document(upload, caption=caption[:1024], reply_markup=ai_reply_menu())
+        await users_col.update_one(
+            {"_id": user_id},
+            {"$inc": {"ai_requests_count": 1}, "$set": {"last_ai_request_at": datetime.now(timezone.utc)}},
+            upsert=True,
+        )
+        await log_activity(user_id, "ai_prompt_image", f"prompt={item['id']},provider={result.provider or 'none'}")
 
 
 @dp.callback_query(F.data.startswith("promptuse:"))

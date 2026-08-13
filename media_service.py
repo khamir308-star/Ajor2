@@ -1098,8 +1098,8 @@ async def fetch_instagram_metadata(session: aiohttp.ClientSession, url: str) -> 
         parsed = extract_instagram_post_metadata(body)
         # برای imginn فیلدهای icon-likes/icon-comments را جدا استخراج می‌کنیم
         if "imginn.com" in candidate and shortcode:
-            likes_m = re.search(r"icon-likes\"?>\s*([\d][\d,.]*[KkMm]?)", body)
-            comments_m = re.search(r"icon-comments\"?>\s*([\d][\d,.]*[KkMm]?)", body)
+            likes_m = re.search(r'icon-likes"></i>\s*<span>([\d][\d,.]*[KkMm]?)</span>', body)
+            comments_m = re.search(r'icon-comments"></i>\s*<span>([\d][\d,.]*[KkMm]?)</span>', body)
             if likes_m:
                 parsed["likes"] = _clean_instagram_count(likes_m.group(1))
             if comments_m:
@@ -1108,6 +1108,12 @@ async def fetch_instagram_metadata(session: aiohttp.ClientSession, url: str) -> 
                 desc_m = re.search(r'<meta[^>]+name="description"[^>]+content="([^"]+)"', body, flags=re.I)
                 if desc_m:
                     parsed["caption"] = html_lib.unescape(desc_m.group(1))[:300]
+            # views از imginn فقط اگر الگوی مشخص view-count باشد (در غیر این صورت حذف)
+            views_m = re.search(r'class="view-count"[^>]*>\s*([\d][\d,.]*[KkMm]?)', body)
+            if views_m:
+                parsed["views"] = _clean_instagram_count(views_m.group(1))
+            elif parsed.get("views") and not re.match(r"^[\d][\d,.]*[KkMm]?$", str(parsed.get("views"))):
+                parsed.pop("views", None)
         score = sum(1 for key in ("caption", "likes", "comments", "views", "username") if parsed.get(key))
         best_score = sum(1 for key in ("caption", "likes", "comments", "views", "username") if best.get(key))
         if score > best_score:

@@ -819,6 +819,33 @@ ONLINE_OCCASION_TRANSLATIONS = {
     "International Women's Day": "روز جهانی زنان",
     "World Radio Day": "روز جهانی رادیو",
     "International Mother Language Day": "روز جهانی زبان مادری",
+    "International Left-Handers Day": "روز جهانی چپ‌دستان",
+    "International Youth Day": "روز جهانی جوانان",
+    "World Humanitarian Day": "روز جهانی بشردوستی",
+    "International Literacy Day": "روز جهانی سوادآموزی",
+    "World Suicide Prevention Day": "روز جهانی پیشگیری از خودکشی",
+    "International Day of Democracy": "روز جهانی دموکراسی",
+    "World Cleanup Day": "روز جهانی پاکسازی زمین",
+    "International Day of Charity": "روز جهانی خیریه",
+    "World Water Day": "روز جهانی آب",
+    "World Autism Awareness Day": "روز جهانی آگاهی از اوتیسم",
+    "World Teachers' Day": "روز جهانی معلم",
+    "World Post Day": "روز جهانی پست",
+    "World Food Day": "روز جهانی غذا",
+    "World Savings Day": "روز جهانی پس‌انداز",
+    "World Science Day": "روز جهانی علم",
+    "World Television Day": "روز جهانی تلویزیون",
+    "World Children's Day": "روز جهانی کودک",
+    "World AIDS Day": "روز جهانی ایدز",
+    "International Day of Persons with Disabilities": "روز جهانی معلولان",
+    "World Soil Day": "روز جهانی خاک",
+    "World Human Rights Day": "روز جهانی حقوق بشر",
+    "International Mountain Day": "روز جهانی کوهستان",
+    "International Migrants Day": "روز جهانی مهاجران",
+    "World Cancer Day": "روز جهانی سرطان",
+    "World Wetlands Day": "روز جهانی تالاب‌ها",
+    "World Wildlife Day": "روز جهانی حیات وحش",
+    "World Backup Day": "روز جهانی پشتیبان‌گیری",
     "International Men's Day": "روز جهانی مردان",
     "International Men’s Day": "روز جهانی مردان",
     "World Men's Day": "روز جهانی مردان",
@@ -827,7 +854,6 @@ ONLINE_OCCASION_TRANSLATIONS = {
     "World Day of Men": "روز جهانی مردان",
     "World Consumer Rights Day": "روز جهانی حقوق مصرف‌کننده",
     "World Sleep Day": "روز جهانی خواب",
-    "World Water Day": "روز جهانی آب",
     "World Poetry Day": "روز جهانی شعر",
     "World Theatre Day": "روز جهانی تئاتر",
     "World Press Freedom Day": "روز جهانی آزادی مطبوعات",
@@ -17777,6 +17803,12 @@ async def fetch_online_occasions(year: int, month: int, day: int) -> list[dict]:
     for raw_title in titles:
         title = clean_feed_text(raw_title, 100)
         if title and title not in {"Daily Updates"} and title not in cleaned:
+            # مناسبت‌های ملی کشورهای خارجی (National ...) برای کاربر ایرانی معنا ندارند
+            lowered = title.lower()
+            if lowered.startswith("national "):
+                continue
+            if lowered.startswith("on this day"):
+                continue
             cleaned.append(title)
     # مناسبت‌های جهانی/بین‌المللی و Rain Day بر مناسبت‌های صرفاً ملی اولویت دارند.
     cleaned.sort(

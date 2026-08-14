@@ -1,8 +1,8 @@
 # Stage 1: باینری سرور لوکال Bot API (TDLight — سازگار با Alpine/musl)
 FROM tdlight/tdlightbotapi:10.2 AS botapi
 
-# Stage 2: محیط اجرای ربات (Alpine) + libssl1.1 از Alpine 3.16 (مورد نیاز باینری Bot API)
-FROM python:3.12-alpine
+# Stage 2: محیط اجرای ربات — Debian slim (build سریع و مطمئن روی Render)
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -10,22 +10,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# ffmpeg برای فشرده‌سازی ویدئو؛ openssl/libstdc++ برای باینری Bot API؛
-# build-base/python3-dev برای پکیج‌هایی که ویل musllinux ندارند (مثل pymongo).
-# باینری TDLight با OpenSSL 3 سازگار نیست؛ libssl.so.1.1 و libcrypto.so.1.1
-# از پکیج‌های Alpine 3.16 (آخرین نسخه‌ی OpenSSL 1.1) به‌صورت دستی استخراج می‌شوند.
-RUN apk add --no-cache ca-certificates ffmpeg openssl libstdc++ build-base python3-dev wget curl \
-    && wget -q https://dl-cdn.alpinelinux.org/alpine/v3.16/main/x86_64/libcrypto1.1-1.1.1w-r1.apk \
-    && wget -q https://dl-cdn.alpinelinux.org/alpine/v3.16/main/x86_64/libssl1.1-1.1.1w-r1.apk \
-    && mkdir -p /tmp/ossl11 \
-    && tar -xzf libcrypto1.1-1.1.1w-r1.apk -C /tmp/ossl11 \
-    && tar -xzf libssl1.1-1.1.1w-r1.apk -C /tmp/ossl11 \
-    && cp /tmp/ossl11/lib/libcrypto.so.1.1 /usr/lib/ \
-    && cp /tmp/ossl11/lib/libssl.so.1.1 /usr/lib/ \
-    && rm -rf /tmp/ossl11 libcrypto1.1-1.1.1w-r1.apk libssl1.1-1.1.1w-r1.apk \
-    && update-ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=botapi /usr/local/bin/telegram-bot-api /usr/local/bin/telegram-bot-api
+# باینری TDLight (musl) فقط با Alpine کار می‌کند؛ روی Debian از طریق استاتیک‌های گلایبک در دسترس نیست.
+# در این تصویر سرور لوکال ۲ گیگابایتی فعلاً غیرفعال است (LOCAL_BOT_API=false)؛
+# سقف آپلود ۵۰MB است و بعداً با تصویر Alpine قابل ارتقا است.
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

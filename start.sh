@@ -1,9 +1,10 @@
 #!/bin/sh
 set -e
 
-# اگر api_id و api_hash تنظیم شده باشد، سرور لوکال Bot API را بالا می‌آوریم.
-# این سرور محدودیت فایل را از ۵۰MB به ۲۰۰۰MB (۲ گیگابایت) افزایش می‌دهد.
-if [ -n "$TELEGRAM_API_ID" ] && [ -n "$TELEGRAM_API_HASH" ]; then
+# اگر باینری سرور لوکال Bot API وجود داشته باشد و api_id/api_hash تنظیم شده باشد،
+# سرور لوکال را بالا می‌آوریم (سقف فایل از ۵۰MB به ۲۰۰۰MB می‌شود).
+# اگر باینری نباشد (مثل تصویر debian-slim)، عادی polling می‌کنیم.
+if [ -x /usr/local/bin/telegram-bot-api ] && [ -n "$TELEGRAM_API_ID" ] && [ -n "$TELEGRAM_API_HASH" ]; then
   echo "Starting local Telegram Bot API server on 127.0.0.1:8081..."
   mkdir -p /tmp/tgapi /tmp/tgapi-tmp
   /usr/local/bin/telegram-bot-api --local \
@@ -20,6 +21,8 @@ if [ -n "$TELEGRAM_API_ID" ] && [ -n "$TELEGRAM_API_HASH" ]; then
     i=$((i+1))
   done
   echo "Local Bot API ready after ${i}s"
+else
+  echo "Local Bot API binary not present; using standard Bot API (50MB limit)."
 fi
 
 exec python -u bot.py

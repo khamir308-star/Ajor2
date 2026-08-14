@@ -2986,88 +2986,104 @@ async def make_telegram_animation(source: bytes, suffix: str, from_photo: bool =
         return result
 
 
-async def convert_video_to_round(source: bytes, suffix: str, progress_callback=None) -> bytes:
-    """تبدیل ویدئو به ویدئو مسیج دایره‌ای تلگرام (video_note).
+async def download_telegram_media_to_path(file_id: str, dest_path: str) -> str:
+    """دانلود فایل تلگرام مستقیم به دیسک (استریم) — بدون کپی کامل در حافظه.
+
+    در حالت سرور لوکال Bot API، file_path مطلق است و مستقیم از دیسک کپی می‌شود؛
+    در غیر این صورت با دانلود استریمی aiohttp روی دیسک نوشته می‌شود.
+    این روش برای فایل‌های بزرگ (ویدئو، سند) حیاتی است تا RAM سرور منفجر نشود.
+    """
+    telegram_file = await bot.get_file(file_id)
+    dest = Path(dest_path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    if LOCAL_BOT_API and telegram_file.file_path and str(telegram_file.file_path).startswith("/"):
+        local_path = Path(str(telegram_file.file_path))
+        if local_path.exists():
+            shutil.copyfile(local_path, dest)
+            return str(dest)
+    await bot.download_file(telegram_file.file_path, destination=dest)
+    return str(dest)
+
+
+async def convert_video_to_round(input_path: str, output_path: str, progress_callback=None) -> str:
+    """تبدیل ویدئو به ویدئو مسیج دایره‌ای تلگرام (video_note) — بدون کپی در حافظه.
 
     - خروجی: MP4 مربع (640x640) + H.264 + AAC — مناسب send_video_note
+    - همه‌ی پردازش روی دیسک انجام می‌شود؛ فقط مسیر فایل‌ها جابه‌جا می‌شود.
     - progress_callback(percent, stage): درصد آماده‌سازی ۰ تا ۱۰۰
     """
     if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
         raise ValueError("موتور تبدیل ویدئو روی سرور در دسترس نیست")
-    if not source:
+    input_path = str(input_path)
+    output_path = str(output_path)
+    if not Path(input_path).exists() or Path(input_path).stat().st_size == 0:
         raise ValueError("فایل ورودی خالی است")
-    safe_suffix = suffix.lower() if re.fullmatch(r"\.[a-z0-9]{2,5}", suffix.lower()) else ".mp4"
-    with tempfile.TemporaryDirectory(prefix="ajor-round-") as folder:
-        input_path = Path(folder) / f"input{safe_suffix}"
-        output_path = Path(folder) / "round.mp4"
-        input_path.write_bytes(source)
-        if progress_callback:
-            await progress_callback(5, "در حال بررسی ویدئو")
+    if progress_callback:
+        await progress_callback(5, "در حال بررسی ویدئو")
 
-        # مدت‌زمان ویدئو با ffprobe (برای محاسبه‌ی درصد)
-        duration = 0.0
-        try:
-            probe = await asyncio.create_subprocess_exec(
-                "ffprobe", "-v", "error", "-show_entries", "format=duration",
-                "-of", "default=noprint_wrappers=1:nokey=1", str(input_path),
-                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, _ = await asyncio.wait_for(probe.communicate(), timeout=30)
-            duration = float((stdout or b"").decode(errors="ignore").strip() or 0)
-        except Exception:
-            duration = 0.0
-        if duration <= 0:
-            duration = 60.0  # اگر نتوانستیم بفهمیم، فرض می‌کنیم ۶۰ ثانیه است
-
-        command = [
-            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-            "-i", str(input_path), "-t", "60",
-            "-vf", (
-                "scale=640:640:force_original_aspect_ratio=decrease,"
-                "pad=640:640:(ow-iw)/2:(oh-ih)/2:color=black,fps=30"
-            ),
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
-            "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "64k", "-ar", "44100",
-            "-movflags", "+faststart",
-            "-progress", "pipe:1", "-nostats",
-            str(output_path),
-        ]
-        process = await asyncio.create_subprocess_exec(
-            *command,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
+    # مدت‌زمان ویدئو با ffprobe (برای محاسبه‌ی درصد دقیق)
+    duration = 0.0
+    try:
+        probe = await asyncio.create_subprocess_exec(
+            "ffprobe", "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", input_path,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
         )
-        try:
-            last_time = 0.0
-            async for line in process.stdout:
-                try:
-                    text = line.decode(errors="ignore").strip()
-                    if text.startswith("out_time_us="):
-                        us = int(text.split("=", 1)[1])
-                        current = us / 1_000_000
-                        if current >= last_time:
-                            last_time = current
-                            percent = min(95, int(5 + (current / max(duration, 1)) * 90))
-                            if progress_callback:
-                                await progress_callback(percent, "در حال آماده‌سازی ویدئو")
-                except (ValueError, AttributeError):
-                    pass
-            stderr = await process.stderr.read()
-            await process.wait()
-        except asyncio.TimeoutError as exc:
-            process.kill()
-            await process.communicate()
-            raise ValueError("تبدیل ویدئو بیش از حد طول کشید") from exc
-        if process.returncode != 0 or not output_path.exists():
-            log.warning("ffmpeg round failed: %s", stderr.decode(errors="ignore")[:500])
-            raise ValueError("تبدیل ویدئو به دایره‌ای ناموفق بود؛ فرمت ویدئو را بررسی کن")
-        result = output_path.read_bytes()
-        if not result:
-            raise ValueError("خروجی تبدیل ویدئو خالی است")
-        if progress_callback:
-            await progress_callback(100, "آماده شد")
-        return result
+        stdout, _ = await asyncio.wait_for(probe.communicate(), timeout=30)
+        duration = float((stdout or b"").decode(errors="ignore").strip() or 0)
+    except Exception:
+        duration = 0.0
+    if duration <= 0:
+        duration = 60.0  # اگر نتوانستیم بفهمیم، فرض می‌کنیم ۶۰ ثانیه است
+
+    command = [
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+        "-i", input_path, "-t", "60",
+        "-vf", (
+            "scale=640:640:force_original_aspect_ratio=decrease,"
+            "pad=640:640:(ow-iw)/2:(oh-ih)/2:color=black,fps=30"
+        ),
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "64k", "-ar", "44100",
+        "-movflags", "+faststart",
+        "-progress", "pipe:1", "-nostats",
+        output_path,
+    ]
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=asyncio.subprocess.PIPE,
+        # stderr به DEVNULL می‌رود تا بافر پر نشود و deadlock رخ ندهد؛
+        # در صورت خطا فقط returncode بررسی می‌شود.
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    try:
+        last_time = 0.0
+        async for line in process.stdout:
+            try:
+                text = line.decode(errors="ignore").strip()
+                if text.startswith("out_time_us="):
+                    us = int(text.split("=", 1)[1])
+                    current = us / 1_000_000
+                    if current >= last_time:
+                        last_time = current
+                        percent = min(95, int(5 + (current / max(duration, 1)) * 90))
+                        if progress_callback:
+                            await progress_callback(percent, "در حال آماده‌سازی ویدئو")
+            except (ValueError, AttributeError):
+                pass
+        await process.wait()
+    except asyncio.TimeoutError as exc:
+        process.kill()
+        await process.communicate()
+        raise ValueError("تبدیل ویدئو بیش از حد طول کشید") from exc
+    if process.returncode != 0 or not Path(output_path).exists():
+        raise ValueError("تبدیل ویدئو به دایره‌ای ناموفق بود؛ فرمت ویدئو را بررسی کن")
+    if Path(output_path).stat().st_size == 0:
+        raise ValueError("خروجی تبدیل ویدئو خالی است")
+    if progress_callback:
+        await progress_callback(100, "آماده شد")
+    return output_path
 
 
 async def send_gif_result(message: types.Message, media, suffix: str, from_photo: bool = False):
@@ -13517,21 +13533,22 @@ async def handle_video_round_request(message: types.Message) -> None:
         except (TelegramBadRequest, TelegramForbiddenError):
             pass
 
+    temp_folder = None
     try:
         suffix = ".mp4"
         if media.file_name and Path(str(media.file_name)).suffix:
             suffix = Path(str(media.file_name)).suffix.lower()[:5]
-        if message.video:
-            source = await download_telegram_media(media.file_id)
-        else:
-            source = await download_telegram_media(media.file_id)
-        if not source:
-            raise ValueError("دانلود ویدئو ناموفق بود")
+        # دانلود استریمی مستقیم به دیسک (بدون کپی در RAM) — حیاتی برای فایل‌های بزرگ
+        temp_folder = tempfile.TemporaryDirectory(prefix=f"ajor-round-in-{user_id}-")
+        input_path = Path(temp_folder.name) / f"input{suffix}"
         if progress_message is None:
             await on_progress(1, "در حال دانلود ویدئو")
-        data = await convert_video_to_round(source, suffix, progress_callback=on_progress)
+        await download_telegram_media_to_path(media.file_id, str(input_path))
+        output_path = Path(temp_folder.name) / "round.mp4"
+        await convert_video_to_round(str(input_path), str(output_path), progress_callback=on_progress)
         filename = f"ajorpareh-round-{user_id}-{int(time.time())}.mp4"
-        upload = BufferedInputFile(data, filename=filename)
+        # ارسال مستقیم از دیسک (FSInputFile) — بدون کپی در حافظه
+        upload = FSInputFile(str(output_path), filename=filename)
         try:
             await message.answer_video_note(upload, length=640, request_timeout=600)
         except TelegramBadRequest:
@@ -13552,7 +13569,8 @@ async def handle_video_round_request(message: types.Message) -> None:
             {"$inc": {"round_videos_created": 1}, "$set": {"last_round_video_at": datetime.now(timezone.utc)}},
             upsert=True,
         )
-        await log_activity(user_id, "video_round", f"size={len(data)}")
+        size_bytes = Path(output_path).stat().st_size if output_path and Path(output_path).exists() else 0
+        await log_activity(user_id, "video_round", f"size={size_bytes}")
     except (TelegramBadRequest, TelegramForbiddenError) as exc:
         log.warning("ارسال ویدئو دایره‌ای ناموفق بود: %s", exc)
         if progress_message:
@@ -13571,6 +13589,12 @@ async def handle_video_round_request(message: types.Message) -> None:
             f"❌ {getattr(exc, 'message', 'تبدیل ویدئو ناموفق بود؛ فرمت یا طول ویدئو را بررسی کن')}",
             reply_markup=media_download_reply_menu(),
         )
+    finally:
+        if temp_folder is not None:
+            try:
+                temp_folder.cleanup()
+            except Exception:
+                pass
 
 
 @dp.message(F.photo)

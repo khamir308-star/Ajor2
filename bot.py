@@ -8690,6 +8690,11 @@ async def instant_repost_start_callback(callback: types.CallbackQuery):
         return await callback.answer("اول گروه بازنشر باز رو منتشر یا کنسل کن.", show_alert=True)
     repost_sessions.discard(callback.from_user.id)
     cancel_album_buffers(callback.from_user.id)
+    # پاک‌سازی session های هوش مصنوعی تا عکس بعدی به‌جای کانال به ساخت تصویر نرود
+    prompt_image_sessions.pop(callback.from_user.id, None)
+    ai_sessions.pop(callback.from_user.id, None)
+    gif_sessions.discard(callback.from_user.id)
+    sticker_sessions.discard(callback.from_user.id)
     instant_repost_sessions[callback.from_user.id] = []
     await callback.message.answer(
         "⚡ <b>انتشار فوری فعال شد</b>\n\n"
@@ -13414,23 +13419,23 @@ async def handle_admin_receipt_photo(message: types.Message):
             try: await bot.send_photo(admin_id, photo_id, caption=caption, parse_mode="HTML", reply_markup=keyboard)
             except (TelegramForbiddenError, TelegramBadRequest): pass
         return await message.answer("✅ رسید ثبت شد و برای بررسی مدیر ارسال شد.", reply_markup=service_reply_menu())
-    if message.from_user.id in prompt_image_sessions:
+    if message.from_user.id in prompt_image_sessions and message.from_user.id not in instant_repost_sessions and message.from_user.id not in repost_sessions:
         await handle_prompt_reference_image(message)
         return
     ai_mode = ai_sessions.get(message.from_user.id, {}).get("mode")
-    if ai_mode in {"vision", "edit_image"}:
+    if ai_mode in {"vision", "edit_image"} and message.from_user.id not in instant_repost_sessions:
         await handle_ai_photo_request(message, ai_mode)
         return
     if ai_mode == "image":
         # اگر کاربر در حالت ساخت تصویر، عکس را با کپشن/پرامپت فرستاد،
         # آن را به‌عنوان عکس مرجع اجرا کن تا جنسیت و هویت عوض نشود.
-        if (message.caption or "").strip():
+        if (message.caption or "").strip() and message.from_user.id not in instant_repost_sessions:
             prompt_image_sessions[message.from_user.id] = message.caption.strip()
             await handle_prompt_reference_image(message)
             return
         await message.answer("🎨 برای ساخت تصویر، توضیحت رو به‌صورت متن بفرست؛ یا عکس را همراه کپشن پرامپت بفرست.", reply_markup=ai_reply_menu())
         return
-    if ai_mode:
+    if ai_mode and message.from_user.id not in instant_repost_sessions:
         await message.answer("📝 این ابزار ورودی متنی می‌خواد؛ نوشته‌ات رو به‌صورت پیام بفرست یا «👁 تحلیل تصویر» رو انتخاب کن.", reply_markup=ai_reply_menu())
         return
     if message.from_user.id in gif_sessions:
@@ -15726,6 +15731,8 @@ async def prompt_generate_image_callback(callback: types.CallbackQuery):
     await callback.answer("🎨 شروع ساخت تصویر...")
     ai_sessions.pop(user_id, None)
     prompt_image_sessions.pop(user_id, None)
+    instant_repost_sessions.pop(user_id, None)
+    repost_sessions.discard(user_id)
     async with lock:
         waiting = await callback.message.answer(
             f"🖼 <b>در حال ساخت تصویر با پرامپت:</b>\n<pre>{html.escape(prompt[:300])}</pre>",
@@ -15771,6 +15778,8 @@ async def prompt_use_callback(callback: types.CallbackQuery):
         return await callback.answer("این پرامپت برای ساخت تصویر نیست.", show_alert=True)
     prompt_image_sessions[callback.from_user.id] = item["prompt"]
     ai_sessions.pop(callback.from_user.id, None)
+    instant_repost_sessions.pop(callback.from_user.id, None)
+    repost_sessions.discard(callback.from_user.id)
     await callback.message.answer(
         "🎨 پرامپت آماده شد. حالا عکس مرجعت رو بفرست؛ جنسیت، چهره، مدل مو و هویت عکس حفظ می‌شه.\n\n"
         f"<pre>{html.escape(item['prompt'])}</pre>\n\n"

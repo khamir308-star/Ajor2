@@ -1916,6 +1916,33 @@ class AsyncCoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "sent")
         self.assertEqual(calls["n"], 3)
 
+    def test_hokm_serialize_roundtrip(self):
+        """🎮 سریال‌سازی/بازسازی اتاق حکم (برای کش Redis)."""
+        import uuid
+        game = bot.HokmGame(uuid.uuid4().hex[:10], 0, 466050034, "تست")
+        game.seats[1] = 123456789
+        game.names[1] = "بازیکن ۲"
+        game.human_seats = [0, 1]
+        game.start()
+        data = bot._hokm_serialize(game)
+        restored = bot._hokm_deserialize(data)
+        self.assertEqual(restored.room_id, game.room_id)
+        self.assertEqual(restored.seats, game.seats)
+        self.assertEqual(restored.phase, game.phase)
+        self.assertEqual(restored.human_seats, game.human_seats)
+        self.assertEqual(restored.names, game.names)
+
+    def test_media_cache_key(self):
+        """📁 کلید کش file_id بر اساس URL."""
+        self.assertEqual(
+            bot._media_cache_key("https://example.com/a.bin"),
+            bot._media_cache_key("https://example.com/a.bin"),
+        )
+        self.assertNotEqual(
+            bot._media_cache_key("https://example.com/a.bin"),
+            bot._media_cache_key("https://example.com/b.bin"),
+        )
+        self.assertEqual(bot._media_cache_key("not-a-url"), "")
 
 if __name__ == "__main__":
     unittest.main()

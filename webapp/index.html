@@ -582,14 +582,14 @@
         </div>
         <div class="rewards-grid">
           <section class="wheel-card"><span class="eyebrow">هر روز یک چرخش رایگان</span><h2>گردونه شانس</h2><div class="wheel-disc" id="wheelDisc"><span>🎁</span><i>🪙</i><b>⚡</b></div><p id="spinHint">اولین چرخش امروز رایگانه.</p><button class="btn btn-accent" id="spinButton">بچرخون!</button></section>
-          <section class="club-panel"><div class="section-heading compact"><div><span>آیتم‌های مجازی</span><h2>فروشگاه</h2></div></div><div class="shop-grid" id="shopGrid"><p>در حال دریافت آیتم‌ها...</p></div></section>
+          <section class="club-panel"><div class="section-heading compact"><div><span>آیتم‌های مجازی</span><h2>فروشگاه</h2></div></div><div class="shop-grid" id="shopGrid"><div class="skeleton sk-card"></div><div class="skeleton sk-card"></div><div class="skeleton sk-card"></div></div></section>
         </div>
         <div class="club-lower-grid">
           <section class="club-panel gift-code-panel"><div class="section-heading compact"><div><span>هدیه مدیر و کمپین‌ها</span><h2>فعال‌سازی کد هدیه</h2></div><span>🎟</span></div><form id="miniGiftForm"><input id="miniGiftCode" maxlength="20" autocomplete="off" placeholder="مثلاً AJOR100" required /><button type="submit">دریافت هدیه</button></form><p id="miniGiftHint">کد می‌تونه شامل سکه، XP، سهمیه AI، نشان، استیکر یا گیف باشه.</p></section>
-          <section class="club-panel mission-club"><div class="section-heading compact"><div><span>کار واقعی، جایزه واقعی</span><h2>مأموریت‌های جایزه</h2></div><button class="news-refresh" id="missionRefresh" type="button"><svg><use href="#i-refresh"/></svg> بروزرسانی</button></div><div id="missionList" class="mission-list"><p>در حال محاسبه مأموریت‌ها...</p></div></section>
+          <section class="club-panel mission-club"><div class="section-heading compact"><div><span>کار واقعی، جایزه واقعی</span><h2>مأموریت‌های جایزه</h2></div><button class="news-refresh" id="missionRefresh" type="button"><svg><use href="#i-refresh"/></svg> بروزرسانی</button></div><div id="missionList" class="mission-list"><div class="skeleton sk-line"></div><div class="skeleton sk-line"></div><div class="skeleton sk-line"></div></div></section>
           <section class="club-panel"><div class="section-heading compact"><div><span>با سکه شرکت کن</span><h2>قرعه‌کشی‌ها</h2></div></div><div id="raffleList" class="club-list"><p>فعلاً در حال بررسی...</p></div></section>
-          <section class="club-panel"><div class="section-heading compact"><div><span>ترند بعدی رو حدس بزن</span><h2>پیش‌بینی‌ها</h2></div></div><div id="predictionList" class="club-list"><p>در حال بارگذاری...</p></div></section>
-          <section class="club-panel leaderboard-live"><div class="section-heading compact"><div><span>مسابقه تازه</span><h2>برترین‌های دوره</h2></div><div class="period-tabs"><button class="active" data-live-board="weekly">هفته</button><button data-live-board="monthly">ماه</button></div></div><div id="liveLeaderboard" class="live-leaderboard"><p>در حال محاسبه...</p></div></section>
+          <section class="club-panel"><div class="section-heading compact"><div><span>ترند بعدی رو حدس بزن</span><h2>پیش‌بینی‌ها</h2></div></div><div id="predictionList" class="club-list"><div class="skeleton sk-line"></div><div class="skeleton sk-line"></div><div class="skeleton sk-line"></div></div></section>
+          <section class="club-panel leaderboard-live"><div class="section-heading compact"><div><span>مسابقه تازه</span><h2>برترین‌های دوره</h2></div><div class="period-tabs"><button class="active" data-live-board="weekly">هفته</button><button data-live-board="monthly">ماه</button></div></div><div id="liveLeaderboard" class="live-leaderboard"><div class="skeleton sk-line"></div><div class="skeleton sk-line"></div><div class="skeleton sk-line"></div></div></section>
         </div>
       </section>
 
@@ -669,7 +669,7 @@
               <label>زمان به وقت تهران<input id="reminderTime" type="datetime-local" required /></label>
               <button class="btn btn-cyan" type="submit">ثبت یادآور</button>
             </form>
-            <div class="reminder-list" id="reminderList"><p>در حال دریافت یادآورها...</p></div>
+            <div class="reminder-list" id="reminderList"><div class="skeleton sk-line"></div><div class="skeleton sk-line"></div><div class="skeleton sk-line"></div></div>
           </div>
         </section>
         <p class="ai-privacy-note"><svg><use href="#i-shield"/></svg> رمز، کد ورود، اطلاعات بانکی و متن محرمانه برای هوش مصنوعی نفرست.</p>
@@ -705,7 +705,7 @@
         </div>
         <section class="reviews-section" aria-labelledby="reviews-title">
           <div class="section-heading compact"><div><span>بازخورد و تجربه</span><h2 id="reviews-title">نظرات کاربران</h2></div><span class="demo-label">نمونه‌های نمایشی مشخص شده‌اند</span></div>
-          <div class="reviews-grid" id="reviewsGrid" aria-live="polite"><p>در حال دریافت نظرها...</p></div>
+          <div class="reviews-grid" id="reviewsGrid" aria-live="polite"><div class="skeleton sk-card"></div><div class="skeleton sk-card"></div></div>
           <form class="review-form" id="reviewForm">
             <div><label>امتیاز<select id="reviewRating"><option value="5">۵ ستاره</option><option value="4">۴ ستاره</option><option value="3">۳ ستاره</option><option value="2">۲ ستاره</option><option value="1">۱ ستاره</option></select></label></div>
             <label>نظر شما<textarea id="reviewText" minlength="5" maxlength="500" required placeholder="کدوم بخش Mini App رو بیشتر دوست داشتی؟"></textarea></label>
@@ -786,7 +786,7 @@
           <div><span class="section-kicker"><span></span> سرویس‌های اشتراکی با ستاره</span><h1 id="shop-title">فروشگاه سرویس‌ها</h1><p>V2Ray و NPV اختصاصی — پرداخت با ستاره‌های تلگرام ⭐ مستقیم از همین‌جا.</p></div>
           <div class="coin-balance"><span>💱 نرخ هر ستاره</span><b id="shopStarRate">…</b><small>قیمت رسمی تلگرام × دلار لحظه‌ای</small></div>
         </div>
-        <div id="shopCatalog" class="club-lower-grid"><p>در حال بارگذاری سرویس‌ها...</p></div>
+        <div id="shopCatalog" class="club-lower-grid"><div class="skeleton sk-card"></div><div class="skeleton sk-card"></div></div>
         <div class="page-gap"></div>
       </section>
     </main>

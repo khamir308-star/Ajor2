@@ -177,6 +177,24 @@
     pop?.classList.remove("show"); pop?.setAttribute("aria-hidden", "true");
   }
 
+  function skeletonHTML(kind = "card", count = 3) {
+    const row = (lines) => `<div class="skeleton sk-row">${lines}</div>`;
+    if (kind === "title") return '<div class="skeleton-wrap"><div class="skeleton sk-title"></div><div class="skeleton sk-line"></div><div class="skeleton sk-line short"></div></div>';
+    if (kind === "cards") {
+      let out = '<div class="skeleton-wrap">';
+      for (let i = 0; i < count; i++) out += '<div class="skeleton sk-card"></div>';
+      return out + '</div>';
+    }
+    if (kind === "badges") {
+      let out = '<div class="skeleton-wrap">';
+      for (let i = 0; i < count; i++) out += row('<div class="skeleton sk-badge"></div><div><div class="skeleton sk-line short"></div><div class="skeleton sk-line"></div></div>');
+      return out + '</div>';
+    }
+    let out = '<div class="skeleton-wrap">';
+    for (let i = 0; i < count; i++) out += '<div class="skeleton sk-line"></div>';
+    return out + '</div>';
+  }
+
   function showToast(title, message, kind = "success") {
     const toast = $("#toast");
     $("b", toast).textContent = title;
@@ -1322,7 +1340,7 @@
   async function loadMusicTrending() {
     const container = $("#musicResults"); if (!container) return;
     if (!tgCandidate?.initData) { container.innerHTML = "<p>برای مشاهده ترندها، Mini App را از داخل @Ajorparehbot باز کن.</p>"; return; }
-    container.innerHTML = "<p>در حال دریافت ترندها...</p>";
+    container.innerHTML = skeletonHTML("cards", 3);
     try {
       const response = await apiRequest("/api/music/trending");
       const data = await response.json();
@@ -1334,7 +1352,7 @@
   async function loadMusicRegion(region, containerSel = "#musicTrendingResults") {
     const container = $(containerSel); if (!container) return;
     if (!tgCandidate?.initData) { container.innerHTML = "<p>برای مشاهدهٔ موسیقی ایرانی، Mini App را از داخل @Ajorparehbot باز کن.</p>"; return; }
-    container.innerHTML = "<p>در حال دریافت موزیک ایرانی...</p>";
+    container.innerHTML = skeletonHTML("cards", 3);
     try {
       const response = await apiRequest(`/api/music/trending?region=${encodeURIComponent(region)}`);
       const data = await response.json();
@@ -1346,7 +1364,7 @@
   async function loadMusicListen() {
     const container = $("#musicResults"); if (!container) return;
     if (!tgCandidate?.initData) { container.innerHTML = "<p>برای گوش دادن آنلاین، Mini App را از داخل @Ajorparehbot باز کن.</p>"; return; }
-    container.innerHTML = "<p>در حال دریافت ترندها برای پخش آنلاین…</p>";
+    container.innerHTML = skeletonHTML("cards", 3);
     try {
       const response = await apiRequest("/api/music/trending");
       const data = await response.json();
@@ -1384,7 +1402,7 @@
   function loadMusicTrendingInto(containerSel) {
     const container = $(containerSel); if (!container) return;
     if (!tgCandidate?.initData) { container.innerHTML = "<p>برای مشاهده ترندها، Mini App را از داخل @Ajorparehbot باز کن.</p>"; return; }
-    container.innerHTML = "<p>در حال دریافت ترندها...</p>";
+    container.innerHTML = skeletonHTML("cards", 3);
     apiRequest("/api/music/trending").then(r => r.json()).then(data => {
       if (!data.ok) throw new Error(data.message || "trending failed");
       renderMusicItems(data.items, containerSel);
@@ -2020,7 +2038,7 @@
   async function loadShop() {
     const container = $("#shopCatalog");
     if (!container) return;
-    container.innerHTML = "<p>در حال بارگذاری سرویس‌ها...</p>";
+    container.innerHTML = skeletonHTML("cards", 3);
     try {
       const headers = { Accept: "application/json" };
       if (tgCandidate?.initData) headers["X-Telegram-Init-Data"] = tgCandidate.initData;

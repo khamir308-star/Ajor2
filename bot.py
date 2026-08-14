@@ -259,6 +259,7 @@ ai_provider_metrics_col = db["ai_provider_metrics"]
 reminders_col = db["user_reminders"]
 reviews_col = db["user_reviews"]
 media_jobs_col = db["media_jobs"]
+media_file_cache_col = db["media_file_cache"]  # کش file_id بر اساس URL (برای جلوگیری از دانلود تکراری)
 
 ai_service = AIService(AIConfig.from_env(), ai_usage_col, ai_provider_metrics_col, users_col)
 
@@ -1412,12 +1413,118 @@ music_daily_time_sessions: set[int] = set()
 music_playlist_upload_sessions: dict[int, int] = {}
 music_search_cache: dict[int, list[dict]] = {}
 quick_quiz_recent: dict[int, list[int]] = {}
-hokm_rooms: dict[str, HokmGame] = {}  # اتاق‌های بازی حکم آنلاین (حافظه + TTL)
+hokm_rooms: dict[str, HokmGame] = {}  # اتاق‌های بازی حکم آنلاین (حافظه + Redis)
 duel_rooms: dict[str, dict] = {}  # اتاق‌های دوئل ۱v۱
 
 
+# ============ کش دو لایه (Redis مشترک + حافظهٔ محلی) ============
+# برای همگام‌سازی state بازی‌های آنلاین (حکم) بین چند instance و جلوگیری از
+# گم‌شدن بازی هنگام ری‌استارت. اگر Redis تنظیم نباشد، فقط حافظهٔ محلی کار می‌کند.
+_kv_memory: dict[str, tuple[float, str]] = {}
+_kv_redis_url = os.getenv("UPSTASH_REDIS_REST_URL", "").strip().rstrip("/")
+_kv_redis_token = os.getenv("UPSTASH_REDIS_REST_TOKEN", "").strip()
+
+
+def _kv_redis_ok() -> bool:
+    return bool(_kv_redis_url and _kv_redis_token)
+
+
+async def kv_get(key: str):
+    """خواندن مقدار JSON از کش دو لایه: Redis ← حافظهٔ محلی."""
+    if _kv_redis_ok() and http_session is not None:
+        try:
+            async with http_session.get(
+                f"{_kv_redis_url}/get/{key}",
+                headers={"Authorization": f"Bearer {_kv_redis_token}"},
+                timeout=aiohttp.ClientTimeout(total=6),
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json(content_type=None)
+                    raw = data.get("result") if isinstance(data, dict) else None
+                    if raw is not None:
+                        return json.loads(raw)
+        except Exception:
+            pass
+    item = _kv_memory.get(key)
+    if item and item[0] > time.monotonic():
+        return json.loads(item[1])
+    if item:
+        _kv_memory.pop(key, None)
+    return None
+
+
+async def kv_set(key: str, value, ttl: int = 7200) -> None:
+    """ذخیره مقدار JSON در هر دو لایه؛ خطای Redis بی‌صدا نادیده گرفته می‌شود."""
+    raw = json.dumps(value, ensure_ascii=False)
+    _kv_memory[key] = (time.monotonic() + ttl, raw)
+    if len(_kv_memory) > 500:
+        stale = [k for k, (exp, _) in _kv_memory.items() if exp < time.monotonic()]
+        for k in stale:
+            _kv_memory.pop(k, None)
+    if _kv_redis_ok() and http_session is not None:
+        try:
+            await http_session.get(
+                f"{_kv_redis_url}/set/{key}/{raw}/ex/{int(ttl)}",
+                headers={"Authorization": f"Bearer {_kv_redis_token}"},
+                timeout=aiohttp.ClientTimeout(total=6),
+            )
+        except Exception:
+            pass
+
+
+async def kv_delete(key: str) -> None:
+    _kv_memory.pop(key, None)
+    if _kv_redis_ok() and http_session is not None:
+        try:
+            await http_session.get(
+                f"{_kv_redis_url}/del/{key}",
+                headers={"Authorization": f"Bearer {_kv_redis_token}"},
+                timeout=aiohttp.ClientTimeout(total=6),
+            )
+        except Exception:
+            pass
+
+
+# ============ همگام‌سازی اتاق‌های حکم با کش ============
+
+def _hokm_serialize(game: HokmGame) -> dict:
+    """سریال‌سازی state بازی حکم به dict قابل ذخیره در Redis/JSON."""
+    return dict(game.__dict__)
+
+
+def _hokm_deserialize(data: dict) -> HokmGame:
+    """بازسازی HokmGame از dict ذخیره‌شده."""
+    game = HokmGame.__new__(HokmGame)
+    game.__dict__.update(data)
+    return game
+
+
+async def _hokm_save_room(game: HokmGame) -> None:
+    """ذخیره اتاق در حافظه + Redis (TTL ۲ ساعت)."""
+    hokm_rooms[game.room_id] = game
+    await kv_set(f"hokm:{game.room_id}", _hokm_serialize(game), ttl=7200)
+
+
+async def _hokm_load_room(room_id: str) -> HokmGame | None:
+    """خواندن اتاق: اول حافظه، بعد Redis (برای instance های دیگر)."""
+    game = await _hokm_load_room(room_id)
+    if game is not None:
+        return game
+    data = await kv_get(f"hokm:{room_id}")
+    if not data:
+        return None
+    game = _hokm_deserialize(data)
+    hokm_rooms[room_id] = game
+    return game
+
+
+async def _hokm_remove_room(room_id: str) -> None:
+    hokm_rooms.pop(room_id, None)
+    await kv_delete(f"hokm:{room_id}")
+
+
 def _hokm_room_expiry() -> None:
-    """اتاق‌های قدیمی‌تر از ۲ ساعت را پاک می‌کند."""
+    """اتاق‌های قدیمی‌تر از ۲ ساعت را از حافظه پاک می‌کند (Redis هم TTL خودش را دارد)."""
     now = time.time()
     expired = [rid for rid, game in hokm_rooms.items() if now - game.updated_at > 7200]
     for rid in expired:
@@ -4626,6 +4733,32 @@ async def enqueue_media_job(user_id: int, url: str, mode: str, source: str = "bo
 MEDIA_UPLOAD_TIMEOUT = 3600 if LOCAL_BOT_API else 300
 
 
+def _media_cache_key(url: str) -> str:
+    """کلید کش file_id بر اساس URL (SHA-1). فقط لینک‌های مستقیم کش می‌شوند."""
+    value = str(url or "").strip()
+    if not value.startswith(("http://", "https://")):
+        return ""
+    return hashlib.sha1(value.encode("utf-8")).hexdigest()
+
+
+def _sent_file_id(sent: types.Message) -> str | None:
+    """استخراج file_id از پیام ارسال‌شده (برای ذخیره در کش)."""
+    try:
+        if sent.document:
+            return sent.document.file_id
+        if sent.photo:
+            return sent.photo[-1].file_id
+        if sent.video:
+            return sent.video.file_id
+        if sent.audio:
+            return sent.audio.file_id
+        if sent.animation:
+            return sent.animation.file_id
+    except Exception:
+        pass
+    return None
+
+
 async def send_downloaded_media(user_id: int, item: DownloadedMedia, caption: str) -> types.Message:
     # ارسال مستقیم از دیسک (بدون کپی کامل در حافظه) → شروع آپلود سریع‌تر
     upload = FSInputFile(item.path, filename=item.filename)
@@ -4924,6 +5057,36 @@ async def process_media_job(job: dict) -> None:
             else:
                 if http_session is None:
                     raise MediaServiceError("unavailable", "سرویس دریافت فایل آماده نیست.")
+                direct_cache_key = _media_cache_key(str(job.get("url") or ""))
+                if direct_cache_key:
+                    hit = await media_file_cache_col.find_one({"_id": direct_cache_key})
+                    if hit and hit.get("file_id"):
+                        try:
+                            cached_sent = await bot.send_document(
+                                user_id,
+                                hit["file_id"],
+                                caption=(
+                                    f"📥 {str(hit.get('title') or 'فایل')[:180]}\n"
+                                    "⚡ ارسال از کش — بدون دانلود مجدد"
+                                ),
+                                disable_content_type_detection=True,
+                                request_timeout=MEDIA_UPLOAD_TIMEOUT,
+                            )
+                            await media_jobs_col.update_one({"_id": job["_id"]}, {"$set": {
+                                "status": "completed",
+                                "title": str(hit.get("title") or "فایل")[:300],
+                                "item_count": 1,
+                                "message_ids": [cached_sent.message_id],
+                                "cached": True,
+                                "completed_at": datetime.now(timezone.utc),
+                            }})
+                            await log_activity(user_id, "media_direct", f"job={job['_id']},cached=1")
+                            return
+                        except (TelegramBadRequest, TelegramForbiddenError):
+                            # file_id قدیمی/نامعتبر شده — کش را پاک و دوباره دانلود کن
+                            await media_file_cache_col.delete_one({"_id": direct_cache_key})
+                else:
+                    direct_cache_key = ""
                 is_owner_user = is_owner(user_id)
                 if not is_owner_user:
                     # پیام پیشرفت با نوار درصدی (فقط برای کاربران عادی؛ ادمین مستثنی است)
@@ -4996,6 +5159,7 @@ async def process_media_job(job: dict) -> None:
                 except Exception:
                     pass
             sent_ids = []
+            last_sent = None
             for index, item in enumerate(items, 1):
                 prefix = "🎵" if job["mode"] == "audio" else "📥"
                 info_block = ("\n".join(instagram_info_lines) + "\n") if (index == 1 and instagram_info_lines) else ""
@@ -5007,6 +5171,23 @@ async def process_media_job(job: dict) -> None:
                 )
                 sent = await send_downloaded_media(user_id, item, caption)
                 sent_ids.append(sent.message_id)
+                last_sent = sent
+            if job["mode"] == "direct" and direct_cache_key and sent_ids:
+                file_id = _sent_file_id(last_sent)
+                if file_id:
+                    try:
+                        await media_file_cache_col.update_one(
+                            {"_id": direct_cache_key},
+                            {"$set": {
+                                "file_id": file_id,
+                                "title": title[:300],
+                                "size": int(items[0].size) if items else 0,
+                                "created_at": datetime.now(timezone.utc),
+                            }},
+                            upsert=True,
+                        )
+                    except Exception:
+                        pass
             await media_jobs_col.update_one(
                 {"_id": job["_id"]},
                 {"$set": {
@@ -19050,7 +19231,7 @@ async def miniapp_hokm_api(request: web.Request):
     _hokm_room_expiry()
     if request.method == "GET" and request.path.endswith("/state"):
         room_id = str(request.query.get("room", "")).strip()[:40]
-        game = hokm_rooms.get(room_id)
+        game = await _hokm_load_room(room_id)
         if not game:
             raise web.HTTPNotFound(text="room not found")
         seat = next((s for s, u in game.seats.items() if u == user_id), None)
@@ -19068,13 +19249,13 @@ async def miniapp_hokm_api(request: web.Request):
         room_id = uuid.uuid4().hex[:10]
         seat_a = random.choice([0, 2])
         game = HokmGame(room_id, seat_a, user_id, user.get("first_name") or "بازیکن", difficulty=str(payload.get("difficulty") or "medium"))
-        hokm_rooms[room_id] = game
+        await _hokm_save_room(game)
         await log_activity(user_id, "hokm_create", f"room={room_id}")
         return web.json_response({"ok": True, "room": room_id, "seat": seat_a, "link": f"https://t.me/{SUPPORT_USERNAME}/app?startapp=hokm_{room_id}"}, headers={"Cache-Control": "no-store"})
 
     if action == "join":
         room_id = str(payload.get("room") or "").strip()[:40]
-        game = hokm_rooms.get(room_id)
+        game = await _hokm_load_room(room_id)
         if not game:
             raise web.HTTPNotFound(text="room not found")
         if game.phase != "waiting":
@@ -19088,12 +19269,13 @@ async def miniapp_hokm_api(request: web.Request):
         game.add_log(f"👥 {game.names[seat_b]} به بازی پیوست!")
         game.start()
         await _hokm_auto_advance(game)
+        await _hokm_save_room(game)
         await log_activity(user_id, "hokm_join", f"room={room_id}")
         return web.json_response({"ok": True, **game.public_state(seat_b)}, headers={"Cache-Control": "no-store"})
 
     if action == "move":
         room_id = str(payload.get("room") or "").strip()[:40]
-        game = hokm_rooms.get(room_id)
+        game = await _hokm_load_room(room_id)
         if not game:
             raise web.HTTPNotFound(text="room not found")
         seat = next((s for s, u in game.seats.items() if u == user_id), None)
@@ -19105,11 +19287,13 @@ async def miniapp_hokm_api(request: web.Request):
             if not game.declare_trump(seat, trump):
                 return web.json_response({"ok": False, "reason": "invalid_trump"})
             await _hokm_auto_advance(game)
+            await _hokm_save_room(game)
             return web.json_response({"ok": True, **game.public_state(seat)}, headers={"Cache-Control": "no-store"})
         # شروع دست بعدی
         if game.phase == "dealing":
             game.next_hand()
             await _hokm_auto_advance(game)
+            await _hokm_save_room(game)
             return web.json_response({"ok": True, **game.public_state(seat)}, headers={"Cache-Control": "no-store"})
         # بازی کردن کارت
         if game.phase == "play" and game.turn == seat:
@@ -19117,12 +19301,13 @@ async def miniapp_hokm_api(request: web.Request):
             if not game.play(seat, {"s": str(card.get("s") or "")[:1], "v": int(card.get("v") or 0)}):
                 return web.json_response({"ok": False, "reason": "invalid_move"})
             await _hokm_auto_advance(game)
+            await _hokm_save_room(game)
             return web.json_response({"ok": True, **game.public_state(seat)}, headers={"Cache-Control": "no-store"})
         return web.json_response({"ok": False, "reason": "not_your_turn"})
 
     if action == "state":
         room_id = str(payload.get("room") or "").strip()[:40]
-        game = hokm_rooms.get(room_id)
+        game = await _hokm_load_room(room_id)
         if not game:
             raise web.HTTPNotFound(text="room not found")
         seat = next((s for s, u in game.seats.items() if u == user_id), None)
@@ -19132,7 +19317,7 @@ async def miniapp_hokm_api(request: web.Request):
 
     if action == "leave":
         room_id = str(payload.get("room") or "").strip()[:40]
-        hokm_rooms.pop(room_id, None)
+        await _hokm_remove_room(room_id)
         return web.json_response({"ok": True})
 
     raise web.HTTPBadRequest(text="unknown action")

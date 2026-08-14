@@ -1875,6 +1875,47 @@ class AsyncCoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(bot.is_valid_card_number("1111-1111-1111-1111"))
         self.assertFalse(bot.is_valid_card_number("123"))
 
+    def test_flood_wait_middleware_retries(self):
+        """🛡 FloodWaitMiddleware: بعد از صبر، همان handler دوباره اجرا می‌شود."""
+        from aiogram.exceptions import TelegramRetryAfter
+
+        calls = {"n": 0}
+
+        async def handler(event, data):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise TelegramRetryAfter(method="sendMessage", message="test", retry_after=1)
+            return "ok"
+
+        async def run():
+            middleware = bot.FloodWaitMiddleware()
+            # شبیه‌سازی event با update_id
+            event = SimpleNamespace(update_id=123)
+            return await middleware(handler, event, {})
+
+        result = asyncio.run(run())
+        self.assertEqual(result, "ok")
+        self.assertEqual(calls["n"], 2)  # یک بار خطا + یک بار تلاش مجدد
+
+    def test_safe_telegram_call_retries(self):
+        """🛡 safe_telegram_call: با FloodWait کوتاه تلاش مجدد می‌کند."""
+        from aiogram.exceptions import TelegramRetryAfter
+
+        calls = {"n": 0}
+
+        async def factory():
+            calls["n"] += 1
+            if calls["n"] <= 2:
+                raise TelegramRetryAfter(method="sendMessage", message="test", retry_after=1)
+            return "sent"
+
+        async def run():
+            return await bot.safe_telegram_call(factory, context="test")
+
+        result = asyncio.run(run())
+        self.assertEqual(result, "sent")
+        self.assertEqual(calls["n"], 3)
+
 
 if __name__ == "__main__":
     unittest.main()

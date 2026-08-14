@@ -1695,12 +1695,16 @@ async def notify_maintenance_waiters() -> int:
             for item in users:
                 user_id = int(item["_id"])
                 try:
-                    await bot.send_message(
-                        user_id,
-                        "✅ <b>Ajorpareh دوباره آنلاین شد!</b>\n\n"
-                        "بروزرسانی تموم شده و الان می‌تونی از ربات و Mini App استفاده کنی 🚀",
-                        parse_mode="HTML",
-                        reply_markup=chat_reply_menu(user_id),
+                    # FloodWait خودکار: صبر + تلاش مجدد (تا ۳ بار) — پیام از دست نمی‌رود
+                    await safe_telegram_call(
+                        lambda uid=user_id: bot.send_message(
+                            uid,
+                            "✅ <b>Ajorpareh دوباره آنلاین شد!</b>\n\n"
+                            "بروزرسانی تموم شده و الان می‌تونی از ربات و Mini App استفاده کنی 🚀",
+                            parse_mode="HTML",
+                            reply_markup=chat_reply_menu(uid),
+                        ),
+                        context=f"maintenance-notify:{user_id}",
                     )
                     await users_col.update_one(
                         {"_id": user_id},
@@ -1712,7 +1716,8 @@ async def notify_maintenance_waiters() -> int:
                         {"_id": user_id}, {"$set": {"maintenance_notify_pending": False}}
                     )
                 except TelegramRetryAfter as exc:
-                    await asyncio.sleep(exc.retry_after + 1)
+                    # FloodWait از سقف بزرگ‌تر بود؛ در تلاش بعدی ورکر دوباره می‌فرستد
+                    log.warning("اعلان تعمیرات برای %s با FloodWait بزرگ %ss رها شد", user_id, exc.retry_after)
                 except Exception as exc:
                     log.warning("اعلان پایان تعمیرات برای %s ارسال نشد: %s", user_id, exc)
                 await asyncio.sleep(0.05)
@@ -1808,6 +1813,69 @@ class AccessMiddleware(BaseMiddleware):
 
 dp.message.outer_middleware(AccessMiddleware())
 dp.callback_query.outer_middleware(AccessMiddleware())
+
+
+# ============ مدیریت سراسری FloodWait (TelegramRetryAfter) ============
+# قبلاً TelegramRetryAfter در ۱۰+ جا به‌صورت دستی و ناقص هندل می‌شد (بعضی جاها فقط sleep
+# می‌کرد و پیام را از دست می‌داد). حالا:
+#  ۱) یک middleware سراسری روی همهٔ handler ها محافظت می‌کند (sleep + retry).
+#  ۲) یک تابع کمکی safe_telegram_call برای حلقه‌های ارسال سنگین (broadcast/workers) وجود دارد.
+MAX_FLOOD_WAIT_S = 60  # اگر تلگرام بیشتر از این صبر بخواهد، پیام را با لاگ رها می‌کنیم
+
+
+class FloodWaitMiddleware(BaseMiddleware):
+    """Middleware سراسری: TelegramRetryAfter را هنگام پردازش هر update مدیریت می‌کند.
+
+    - اگر retry_after <= MAX_FLOOD_WAIT_S باشد: صبر می‌کند و همان handler را دوباره اجرا می‌کند.
+    - اگر بزرگ‌تر باشد: لاگ هشدار می‌دهد و خطا را بالا می‌دهد (رویداد از بین نمی‌رود).
+    """
+
+    async def __call__(self, handler, event, data):
+        try:
+            return await handler(event, data)
+        except TelegramRetryAfter as exc:
+            if exc.retry_after <= MAX_FLOOD_WAIT_S:
+                log.info(
+                    "FloodWait سراسری %ss برای %s — صبر و تلاش مجدد",
+                    exc.retry_after, getattr(event, "update_id", "?"),
+                )
+                await asyncio.sleep(exc.retry_after + 0.5)
+                return await handler(event, data)
+            log.warning(
+                "FloodWait سراسری %ss از سقف %ss بیشتر است — رها شد (update=%s)",
+                exc.retry_after, MAX_FLOOD_WAIT_S, getattr(event, "update_id", "?"),
+            )
+            raise
+
+
+async def safe_telegram_call(coro_factory, *, max_retries: int = 3, context: str = ""):
+    """اجرای یک فراخوانی تلگرام با مدیریت خودکار FloodWait (برای حلقه‌های سنگین).
+
+    - coro_factory: یک تابع async (یا lambda) که فراخوانی تلگرام را می‌سازد.
+    - اگر FloodWait <= MAX_FLOOD_WAIT_S باشد: صبر و دوباره تلاش می‌کند (تا max_retries).
+    - اگر بزرگ‌تر باشد: لاگ هشدار می‌دهد و خطا را بالا می‌دهد تا کد صدا زننده تصمیم بگیرد.
+    """
+    last_exc: Exception | None = None
+    for attempt in range(max_retries):
+        try:
+            return await coro_factory()
+        except TelegramRetryAfter as exc:
+            last_exc = exc
+            if exc.retry_after > MAX_FLOOD_WAIT_S:
+                log.warning("FloodWait %ss از سقف بیشتر است (%s) — رها شد", exc.retry_after, context or "?")
+                raise
+            log.info(
+                "FloodWait %ss برای %s (تلاش %d/%d)",
+                exc.retry_after, context or "?", attempt + 1, max_retries,
+            )
+            await asyncio.sleep(exc.retry_after + 0.5)
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("safe_telegram_call بدون نتیجه تمام شد")  # pragma: no cover
+
+
+dp.message.middleware(FloodWaitMiddleware())
+dp.callback_query.middleware(FloodWaitMiddleware())
 
 
 async def is_chat_admin(chat_id: int, user_id: int) -> bool:

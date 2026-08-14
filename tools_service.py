@@ -197,7 +197,7 @@ async def _redis_set(key: str, value: Any, ttl: int = CACHE_TTL_SECONDS) -> bool
         return False
     session = await get_session()
     try:
-        raw = json_dumps(value)
+        raw = quote(json_dumps(value), safe="")  # URL-encode: پشتیبانی از متن فارسی و کاراکترهای خاص
         async with session.get(
             f"{UPSTASH_REST_URL}/set/{key}/{raw}/ex/{int(ttl)}",
             headers={"Authorization": f"Bearer {UPSTASH_REST_TOKEN}"},

@@ -23,7 +23,7 @@ from collections import deque
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from urllib.parse import parse_qsl, urlparse
+from urllib.parse import parse_qsl, urlparse, quote
 from defusedxml import ElementTree
 
 import aiohttp
@@ -1461,10 +1461,15 @@ async def kv_set(key: str, value, ttl: int = 7200) -> None:
         stale = [k for k, (exp, _) in _kv_memory.items() if exp < time.monotonic()]
         for k in stale:
             _kv_memory.pop(k, None)
+        if len(_kv_memory) > 500:
+            # همه تازه بودند — قدیمی‌ترین (اولین) را حذف کن تا حافظه بی‌نهایت رشد نکند
+            oldest = sorted(_kv_memory, key=lambda k: _kv_memory[k][0])[0]
+            _kv_memory.pop(oldest, None)
     if _kv_redis_ok() and http_session is not None:
         try:
+            quoted = quote(raw, safe="")  # URL-encode: پشتیبانی از فارسی و کاراکترهای خاص
             await http_session.get(
-                f"{_kv_redis_url}/set/{key}/{raw}/ex/{int(ttl)}",
+                f"{_kv_redis_url}/set/{key}/{quoted}/ex/{int(ttl)}",
                 headers={"Authorization": f"Bearer {_kv_redis_token}"},
                 timeout=aiohttp.ClientTimeout(total=6),
             )
@@ -1493,9 +1498,29 @@ def _hokm_serialize(game: HokmGame) -> dict:
 
 
 def _hokm_deserialize(data: dict) -> HokmGame:
-    """بازسازی HokmGame از dict ذخیره‌شده."""
+    """بازسازی HokmGame از dict ذخیره‌شده.
+
+    نکتهٔ مهم: در JSON، کلیدهای دیکشنری به string تبدیل می‌شوند (مثل {0: ...} → {"0": ...}).
+    موتور بازی با کلیدهای int کار می‌کند؛ بنابراین اینجا همهٔ کلیدها به int برگردانده می‌شوند.
+    """
     game = HokmGame.__new__(HokmGame)
     game.__dict__.update(data)
+    try:
+        game.seats = {int(k): v for k, v in (game.seats or {}).items()}
+    except (ValueError, TypeError):
+        pass
+    try:
+        game.names = {int(k): v for k, v in (game.names or {}).items()}
+    except (ValueError, TypeError):
+        pass
+    try:
+        game.hands = {int(k): v for k, v in (game.hands or {}).items()}
+    except (ValueError, TypeError):
+        pass
+    try:
+        game.human_seats = [int(s) for s in (game.human_seats or [])]
+    except (ValueError, TypeError):
+        pass
     return game
 
 
@@ -5388,8 +5413,17 @@ async def media_jobs_worker():
         {"status": "processing", "processing_started_at": {"$lt": datetime.now(timezone.utc) - timedelta(minutes=15)}},
         {"$set": {"status": "queued"}, "$unset": {"processing_started_at": ""}},
     )
+    last_reset = 0.0
     while True:
         try:
+            # ریست دوره‌ای job های گیر کرده (worker مرده): از ۱۵ دقیقه به ۵ دقیقه
+            now_mono = time.monotonic()
+            if now_mono - last_reset >= 60:
+                last_reset = now_mono
+                await media_jobs_col.update_many(
+                    {"status": "processing", "processing_started_at": {"$lt": datetime.now(timezone.utc) - timedelta(minutes=5)}},
+                    {"$set": {"status": "queued"}, "$unset": {"processing_started_at": ""}},
+                )
             job = await media_jobs_col.find_one_and_update(
                 {"status": "queued"},
                 {"$set": {"status": "processing", "processing_started_at": datetime.now(timezone.utc)}},
@@ -17675,6 +17709,9 @@ async def keepalive_ping_worker():
                 ping_url = f"{WEBHOOK_BASE_URL}/health"
             elif _public_domain:
                 ping_url = f"https://{_public_domain}/health"
+            if not ping_url.startswith("http") and MINI_APP_URL.startswith("https://"):
+                # دامنه را از MINI_APP_URL استخراج کن (مقاوم در برابر تغییر دامنه)
+                ping_url = MINI_APP_URL.split("/app", 1)[0].rstrip("/") + "/health"
             if not ping_url.startswith("http"):
                 ping_url = "https://ajor2.onrender.com/health"
             if http_session is not None:

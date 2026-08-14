@@ -1944,5 +1944,40 @@ class AsyncCoreTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(bot._media_cache_key("not-a-url"), "")
 
+    def test_media_lock_acquire_release(self):
+        """🔒 قفل توزیع‌شدهٔ صف رسانه: acquire → دوباره acquire رد می‌شود → release → دوباره قبول می‌شود."""
+        import uuid
+        job_id = uuid.uuid4().hex
+
+        async def run():
+            ok1 = await bot._media_lock_acquire(job_id, ttl=30)
+            ok2 = await bot._media_lock_acquire(job_id, ttl=30)
+            await bot._media_lock_release(job_id)
+            ok3 = await bot._media_lock_acquire(job_id, ttl=30)
+            await bot._media_lock_release(job_id)
+            return ok1, ok2, ok3
+
+        r1, r2, r3 = asyncio.run(run())
+        self.assertTrue(r1)
+        self.assertFalse(r2)
+        self.assertTrue(r3)
+
+    def test_media_lock_expires(self):
+        """🔒 قفل با TTL کوتاه خودکار منقضی می‌شود."""
+        import uuid
+        job_id = uuid.uuid4().hex
+
+        async def run():
+            ok1 = await bot._media_lock_acquire(job_id, ttl=1)
+            await asyncio.sleep(1.2)
+            ok2 = await bot._media_lock_acquire(job_id, ttl=30)
+            await bot._media_lock_release(job_id)
+            return ok1, ok2
+
+        r1, r2 = asyncio.run(run())
+        self.assertTrue(r1)
+        self.assertTrue(r2)
+
+
 if __name__ == "__main__":
     unittest.main()

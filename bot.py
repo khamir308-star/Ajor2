@@ -5294,6 +5294,95 @@ async def process_media_job(job: dict) -> None:
                 pass
 
 
+# ============ قفل توزیع‌شده با Redis برای صف رسانه ============
+# مشکل قبلی: ۴ ورکر (و چند instance) همزمان می‌توانستند یک job را پردازش کنند،
+# و اگر worker هنگام پردازش کرش می‌کرد، job تا ۱۵ دقیقه (timeout MongoDB) گیر می‌کرد.
+# راه‌حل: قفل Redis با SET NX EX + heartbeat (تمدید) + آزادسازی در finally.
+# اگر Redis در دسترس نباشد، fallback به حالت قبلی (MongoDB اتمی) انجام می‌شود.
+MEDIA_LOCK_TTL = 600      # ۱۰ دقیقه (بیشتر از طولانی‌ترین دانلود)
+MEDIA_LOCK_PREFIX = "mediajob:"
+_MEDIA_LOCK_MEMORY: dict[str, float] = {}  # fallback محلی وقتی Redis نیست
+
+
+def _media_lock_redis_ok() -> bool:
+    return bool(_kv_redis_url and _kv_redis_token)
+
+
+async def _media_lock_acquire(job_id: str, ttl: int = MEDIA_LOCK_TTL) -> bool:
+    """قفل را با SET NX EX می‌گیرد. اگر Redis نباشد، قفل محلی با TTL استفاده می‌شود."""
+    key = f"{MEDIA_LOCK_PREFIX}{job_id}"
+    if _media_lock_redis_ok() and http_session is not None:
+        try:
+            async with http_session.get(
+                f"{_kv_redis_url}/set/{key}/1/ex/{int(ttl)}/nx",
+                headers={"Authorization": f"Bearer {_kv_redis_token}"},
+                timeout=aiohttp.ClientTimeout(total=6),
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json(content_type=None)
+                    result = data.get("result") if isinstance(data, dict) else None
+                    return result == "OK"
+        except Exception:
+            pass  # fallback به حافظه
+    # fallback محلی (single-instance)
+    now = time.monotonic()
+    existing = _MEDIA_LOCK_MEMORY.get(key)
+    if existing and existing > now:
+        return False
+    _MEDIA_LOCK_MEMORY[key] = now + ttl
+    return True
+
+
+async def _media_lock_renew(job_id: str, ttl: int = MEDIA_LOCK_TTL) -> bool:
+    key = f"{MEDIA_LOCK_PREFIX}{job_id}"
+    if _media_lock_redis_ok() and http_session is not None:
+        try:
+            async with http_session.get(
+                f"{_kv_redis_url}/expire/{key}/{int(ttl)}",
+                headers={"Authorization": f"Bearer {_kv_redis_token}"},
+                timeout=aiohttp.ClientTimeout(total=6),
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json(content_type=None)
+                    result = data.get("result") if isinstance(data, dict) else None
+                    return result == 1 or result == "1"
+        except Exception:
+            pass
+    now = time.monotonic()
+    existing = _MEDIA_LOCK_MEMORY.get(key)
+    if existing and existing > now:
+        _MEDIA_LOCK_MEMORY[key] = now + ttl
+        return True
+    _MEDIA_LOCK_MEMORY[key] = now + ttl
+    return True
+
+
+async def _media_lock_release(job_id: str) -> None:
+    key = f"{MEDIA_LOCK_PREFIX}{job_id}"
+    _MEDIA_LOCK_MEMORY.pop(key, None)
+    if _media_lock_redis_ok() and http_session is not None:
+        try:
+            await http_session.get(
+                f"{_kv_redis_url}/del/{key}",
+                headers={"Authorization": f"Bearer {_kv_redis_token}"},
+                timeout=aiohttp.ClientTimeout(total=6),
+            )
+        except Exception:
+            pass
+
+
+async def _media_lock_heartbeat(job_id: str, stop_event: asyncio.Event, ttl: int = MEDIA_LOCK_TTL) -> None:
+    """هر ۳۰ ثانیه قفل را تمدید می‌کند تا پردازش طولانی منقضی نشود."""
+    while not stop_event.is_set():
+        await asyncio.sleep(30)
+        try:
+            await _media_lock_renew(job_id, ttl)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+
+
 async def media_jobs_worker():
     await media_jobs_col.update_many(
         {"status": "processing", "processing_started_at": {"$lt": datetime.now(timezone.utc) - timedelta(minutes=15)}},
@@ -5309,7 +5398,27 @@ async def media_jobs_worker():
             if not job:
                 await asyncio.sleep(3)
                 continue
-            await process_media_job(job)
+            # قفل توزیع‌شده با Redis: فقط یک worker (در هر instance) اجازهٔ پردازش دارد.
+            job_id = str(job["_id"])
+            if not await _media_lock_acquire(job_id):
+                # worker دیگری در حال پردازش است — job را به صف برمی‌گردانیم
+                await media_jobs_col.update_one(
+                    {"_id": job["_id"], "status": "processing"},
+                    {"$set": {"status": "queued"}, "$unset": {"processing_started_at": ""}},
+                )
+                await asyncio.sleep(2)
+                continue
+            stop_event = asyncio.Event()
+            heartbeat = asyncio.create_task(_media_lock_heartbeat(job_id, stop_event), name=f"media-lock-hb-{job_id[-8:]}")
+            try:
+                await process_media_job(job)
+            finally:
+                stop_event.set()
+                try:
+                    await heartbeat
+                except Exception:
+                    pass
+                await _media_lock_release(job_id)
         except asyncio.CancelledError:
             raise
         except Exception as exc:

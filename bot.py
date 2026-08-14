@@ -1401,6 +1401,7 @@ greeting_add_sessions: dict[int, dict[str, object]] = {}
 greeting_edit_sessions: dict[int, tuple[str, str]] = {}
 sticker_sessions: set[int] = set()
 gif_sessions: set[int] = set()
+video_round_sessions: set[int] = set()  # تبدیل ویدئو به ویدئو مسیج دایره‌ای
 media_request_sessions: dict[int, str] = {}
 instagram_comment_sessions: set[int] = set()
 prompt_image_sessions: dict[int, str] = {}
@@ -2661,7 +2662,8 @@ def media_download_reply_menu() -> ReplyKeyboardMarkup:
         ["🌐 دانلود سایر شبکه‌ها", "🔗 آپلود فایل از URL"],
         ["🛡 بررسی امنیت لینک", "💬 کپی متن کامنت اینستاگرام"],
         ["🎵 موسیقی", "📋 دانلودهای اخیر"],
-        ["📊 سهمیه دانلود", "ℹ️ راهنمای دانلود"],
+        ["🔄 ویدئو به دایره‌ای", "📊 سهمیه دانلود"],
+        ["ℹ️ راهنمای دانلود"],
         ["↩️ ابزارهای ربات"],
         ["🏠 منوی اصلی"],
     ], "اول نوع دریافت رو انتخاب کن، بعد لینک رو بفرست...")
@@ -2981,6 +2983,90 @@ async def make_telegram_animation(source: bytes, suffix: str, from_photo: bool =
         result = output_path.read_bytes()
         if not result or len(result) > 19 * 1024 * 1024:
             raise ValueError("خروجی گیف بیش از حد بزرگ شد")
+        return result
+
+
+async def convert_video_to_round(source: bytes, suffix: str, progress_callback=None) -> bytes:
+    """تبدیل ویدئو به ویدئو مسیج دایره‌ای تلگرام (video_note).
+
+    - خروجی: MP4 مربع (640x640) + H.264 + AAC — مناسب send_video_note
+    - progress_callback(percent, stage): درصد آماده‌سازی ۰ تا ۱۰۰
+    """
+    if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+        raise ValueError("موتور تبدیل ویدئو روی سرور در دسترس نیست")
+    if not source:
+        raise ValueError("فایل ورودی خالی است")
+    safe_suffix = suffix.lower() if re.fullmatch(r"\.[a-z0-9]{2,5}", suffix.lower()) else ".mp4"
+    with tempfile.TemporaryDirectory(prefix="ajor-round-") as folder:
+        input_path = Path(folder) / f"input{safe_suffix}"
+        output_path = Path(folder) / "round.mp4"
+        input_path.write_bytes(source)
+        if progress_callback:
+            await progress_callback(5, "در حال بررسی ویدئو")
+
+        # مدت‌زمان ویدئو با ffprobe (برای محاسبه‌ی درصد)
+        duration = 0.0
+        try:
+            probe = await asyncio.create_subprocess_exec(
+                "ffprobe", "-v", "error", "-show_entries", "format=duration",
+                "-of", "default=noprint_wrappers=1:nokey=1", str(input_path),
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(probe.communicate(), timeout=30)
+            duration = float((stdout or b"").decode(errors="ignore").strip() or 0)
+        except Exception:
+            duration = 0.0
+        if duration <= 0:
+            duration = 60.0  # اگر نتوانستیم بفهمیم، فرض می‌کنیم ۶۰ ثانیه است
+
+        command = [
+            "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+            "-i", str(input_path), "-t", "60",
+            "-vf", (
+                "scale=640:640:force_original_aspect_ratio=decrease,"
+                "pad=640:640:(ow-iw)/2:(oh-ih)/2:color=black,fps=30"
+            ),
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "64k", "-ar", "44100",
+            "-movflags", "+faststart",
+            "-progress", "pipe:1", "-nostats",
+            str(output_path),
+        ]
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            last_time = 0.0
+            async for line in process.stdout:
+                try:
+                    text = line.decode(errors="ignore").strip()
+                    if text.startswith("out_time_us="):
+                        us = int(text.split("=", 1)[1])
+                        current = us / 1_000_000
+                        if current >= last_time:
+                            last_time = current
+                            percent = min(95, int(5 + (current / max(duration, 1)) * 90))
+                            if progress_callback:
+                                await progress_callback(percent, "در حال آماده‌سازی ویدئو")
+                except (ValueError, AttributeError):
+                    pass
+            stderr = await process.stderr.read()
+            await process.wait()
+        except asyncio.TimeoutError as exc:
+            process.kill()
+            await process.communicate()
+            raise ValueError("تبدیل ویدئو بیش از حد طول کشید") from exc
+        if process.returncode != 0 or not output_path.exists():
+            log.warning("ffmpeg round failed: %s", stderr.decode(errors="ignore")[:500])
+            raise ValueError("تبدیل ویدئو به دایره‌ای ناموفق بود؛ فرمت ویدئو را بررسی کن")
+        result = output_path.read_bytes()
+        if not result:
+            raise ValueError("خروجی تبدیل ویدئو خالی است")
+        if progress_callback:
+            await progress_callback(100, "آماده شد")
         return result
 
 
@@ -6999,6 +7085,9 @@ async def cancel_guess(message: types.Message):
     elif user_id in gif_sessions:
         gif_sessions.discard(user_id)
         await message.answer("❌ گیف‌سازی لغو شد.")
+    elif user_id in video_round_sessions:
+        video_round_sessions.discard(user_id)
+        await message.answer("❌ تبدیل ویدئو به دایره‌ای لغو شد.", reply_markup=media_download_reply_menu())
     elif user_id in instagram_comment_sessions:
         instagram_comment_sessions.discard(user_id)
         await message.answer("❌ کپی متن کامنت لغو شد.", reply_markup=media_download_reply_menu())
@@ -13388,9 +13477,100 @@ async def music_recognize_again_callback(callback: types.CallbackQuery):
 async def handle_private_video_for_music(message: types.Message):
     if message.from_user.id in music_recognize_sessions:
         return await handle_music_recognize_request(message)
+    if message.from_user.id in video_round_sessions:
+        return await handle_video_round_request(message)
     # این handler قبلاً ویدئو را مصرف می‌کرد و نمی‌گذاشت مسیر بازنشر/زمان‌بندی
     # به handle_file_upload برسد؛ همهٔ مسیرهای ویدئو را به همان router می‌سپاریم.
     return await handle_file_upload(message)
+
+
+async def handle_video_round_request(message: types.Message) -> None:
+    """تبدیل ویدئو به ویدئو مسیج دایره‌ای با انیمیشن پیشرفت ۰ تا ۱۰۰٪."""
+    user_id = message.from_user.id
+    video_round_sessions.discard(user_id)
+    media = message.video or message.video_note
+    if not media:
+        return await message.answer("❌ یک ویدئو بفرست. /cancel", reply_markup=media_download_reply_menu())
+    if int(media.file_size or 0) > 200 * 1024 * 1024:
+        return await message.answer("❌ حجم ویدئو خیلی زیاد است؛ حداکثر ۲۰۰ مگابایت.", reply_markup=media_download_reply_menu())
+
+    progress_message = None
+    last_percent = -1
+
+    async def on_progress(percent: int, stage: str) -> None:
+        nonlocal progress_message, last_percent
+        percent = max(0, min(100, int(percent)))
+        if percent == last_percent:
+            return
+        last_percent = percent
+        bar = "▓" * round(percent / 10) + "░" * (10 - round(percent / 10))
+        text = (
+            f"🔄 <b>در حال تبدیل ویدئو به دایره‌ای…</b>\n"
+            f"<code>{bar} {percent}%</code>\n"
+            f"{stage}"
+        )
+        try:
+            if progress_message is None:
+                progress_message = await message.answer(text, parse_mode="HTML")
+            else:
+                await progress_message.edit_text(text, parse_mode="HTML")
+        except (TelegramBadRequest, TelegramForbiddenError):
+            pass
+
+    try:
+        suffix = ".mp4"
+        if media.file_name and Path(str(media.file_name)).suffix:
+            suffix = Path(str(media.file_name)).suffix.lower()[:5]
+        if message.video:
+            source = await download_telegram_media(media.file_id)
+        else:
+            source = await download_telegram_media(media.file_id)
+        if not source:
+            raise ValueError("دانلود ویدئو ناموفق بود")
+        if progress_message is None:
+            await on_progress(1, "در حال دانلود ویدئو")
+        data = await convert_video_to_round(source, suffix, progress_callback=on_progress)
+        filename = f"ajorpareh-round-{user_id}-{int(time.time())}.mp4"
+        upload = BufferedInputFile(data, filename=filename)
+        try:
+            await message.answer_video_note(upload, length=640, request_timeout=600)
+        except TelegramBadRequest:
+            # اگر video_note قبول نشد، به‌صورت ویدئو معمولی بفرست
+            await message.answer_video(upload, caption="🔵 ویدئو دایره‌ای (با فرمت ویدئو)", request_timeout=600)
+        if progress_message:
+            try:
+                await progress_message.delete()
+            except (TelegramBadRequest, TelegramForbiddenError):
+                pass
+        await message.answer(
+            "✅ <b>ویدئو مسیج دایره‌ای آماده شد!</b>\n"
+            "🔵 این پیام مثل ویدئو مسیج تلگرام دایره‌ای پخش می‌شه.",
+            parse_mode="HTML", reply_markup=media_download_reply_menu(),
+        )
+        await users_col.update_one(
+            {"_id": user_id},
+            {"$inc": {"round_videos_created": 1}, "$set": {"last_round_video_at": datetime.now(timezone.utc)}},
+            upsert=True,
+        )
+        await log_activity(user_id, "video_round", f"size={len(data)}")
+    except (TelegramBadRequest, TelegramForbiddenError) as exc:
+        log.warning("ارسال ویدئو دایره‌ای ناموفق بود: %s", exc)
+        if progress_message:
+            try: await progress_message.delete()
+            except (TelegramBadRequest, TelegramForbiddenError): pass
+        await message.answer(
+            "❌ ارسال ویدئو دایره‌ای ناموفق بود. ویدئو باید کمتر از ۶۰ ثانیه و حداکثر ۲۰۰ مگابایت باشد.",
+            reply_markup=media_download_reply_menu(),
+        )
+    except Exception as exc:
+        log.warning("تبدیل ویدئو دایره‌ای ناموفق بود: %s", exc)
+        if progress_message:
+            try: await progress_message.delete()
+            except (TelegramBadRequest, TelegramForbiddenError): pass
+        await message.answer(
+            f"❌ {getattr(exc, 'message', 'تبدیل ویدئو ناموفق بود؛ فرمت یا طول ویدئو را بررسی کن')}",
+            reply_markup=media_download_reply_menu(),
+        )
 
 
 @dp.message(F.photo)
@@ -16581,6 +16761,15 @@ async def handle_text(message: types.Message):
     if text == "🛡 بررسی امنیت لینک":
         media_request_sessions[user_id] = "inspect"
         return await message.answer("🛡 لینک کامل رو بفرست تا دامنه، HTTPS، کوتاه‌کننده و نشانه‌های مشکوک بررسی بشه. /cancel", reply_markup=media_download_reply_menu())
+    if text == "🔄 ویدئو به دایره‌ای":
+        video_round_sessions.add(user_id)
+        return await message.answer(
+            "🔵 <b>تبدیل ویدئو به ویدئو مسیج دایره‌ای</b>\n\n"
+            "یک ویدئو بفرست تا به <b>ویدئو مسیج دایره‌ای</b> تلگرام تبدیل بشه.\n"
+            "⏱ حداکثر ۶۰ ثانیه · 📦 تا ۲۰۰ مگابایت · 🎬 با انیمیشن پیشرفت آماده‌سازی\n\n"
+            "حالا ویدئوت رو بفرست. /cancel",
+            parse_mode="HTML", reply_markup=media_download_reply_menu(),
+        )
     if text == "📋 دانلودهای اخیر": return await show_media_jobs(message)
     if text == "📊 سهمیه دانلود": return await show_download_quota(message)
     if text == "ℹ️ راهنمای دانلود":

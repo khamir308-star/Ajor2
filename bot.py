@@ -17555,6 +17555,29 @@ async def self_heal_worker():
         await asyncio.sleep(15 * 60)
 
 
+async def keepalive_ping_worker():
+    """هر ۴ دقیقه به health خودمان ping می‌زند تا Render (پلن رایگان) سرویس را
+    بعد از ۱۵ دقیقهٔ بی‌ترافیک نخواباند (free-plan spin-down)."""
+    while True:
+        await asyncio.sleep(240)
+        try:
+            ping_url = ""
+            if WEBHOOK_BASE_URL:
+                ping_url = f"{WEBHOOK_BASE_URL}/health"
+            elif _public_domain:
+                ping_url = f"https://{_public_domain}/health"
+            if not ping_url.startswith("http"):
+                ping_url = "https://ajor2.onrender.com/health"
+            if http_session is not None:
+                async with http_session.get(ping_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status != 200:
+                        log.warning("self-ping status: %s", resp.status)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            log.warning("self-ping error: %s", exc)
+
+
 @dp.errors()
 async def global_error_handler(event: types.ErrorEvent):
     log.error("خطای پردازش‌نشده: %s", event.exception, exc_info=event.exception)
@@ -19850,6 +19873,7 @@ async def main():
         asyncio.create_task(prayer_azan_worker(), name="prayer-azan-worker")
         asyncio.create_task(weekly_finance_worker(), name="weekly-finance-worker")
         heal_worker_task = asyncio.create_task(self_heal_worker(), name="self-heal-worker")
+        asyncio.create_task(keepalive_ping_worker(), name="keepalive-ping-worker")
         await configure_telegram_ui()
 
 

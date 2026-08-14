@@ -3,6 +3,8 @@ set -e
 
 # اگر باینری سرور لوکال Bot API وجود داشته باشد و api_id/api_hash تنظیم شده باشد،
 # سرور لوکال را بالا می‌آوریم (سقف فایل از ۵۰MB به ۲۰۰۰MB می‌شود).
+# --http-ip-address=127.0.0.1: فقط روی loopback گوش می‌دهد تا Render آن را
+# به‌عنوان پورت اصلی تشخیص ندهد و deploy را ری‌استارت نکند.
 # اگر باینری نباشد (مثل تصویر debian-slim)، عادی polling می‌کنیم.
 if [ -x /usr/local/bin/telegram-bot-api ] && [ -n "$TELEGRAM_API_ID" ] && [ -n "$TELEGRAM_API_HASH" ]; then
   echo "Starting local Telegram Bot API server on 127.0.0.1:8081..."
@@ -13,6 +15,7 @@ if [ -x /usr/local/bin/telegram-bot-api ] && [ -n "$TELEGRAM_API_ID" ] && [ -n "
     --dir=/tmp/tgapi \
     --temp-dir=/tmp/tgapi-tmp \
     --http-port=8081 \
+    --http-ip-address=127.0.0.1 \
     --log=/tmp/tgapi.log &
   # صبر می‌کنیم تا پورت 8081 بالا بیاید (حداکثر ۳۰ ثانیه)
   i=0

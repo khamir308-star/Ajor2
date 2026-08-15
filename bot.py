@@ -270,6 +270,7 @@ group_stats_col = db["group_stats"]  # آمار پیام‌های گروه
 raffles_col = db["group_raffles"]  # قرعه‌کشی‌های گروه
 invite_stats_col = db["invite_stats"]  # آمار دعوت‌های اختصاصی
 anon_messages_col = db["anon_messages"]  # پیام‌های چت ناشناس
+sponsor_requests_col = db["sponsor_requests"]  # درخواست‌های اسپانسر/تبلیغ کانال
 
 # اتصال ماژول vip_service به کالکشن‌ها
 vip_service.users_col = users_col
@@ -1366,6 +1367,7 @@ REPLY_BUTTON_LABELS: set[str] = {
     # پشتیبانی
     "✍️ ارسال پیام پشتیبانی", "💬 نظرات کاربران", "👀 دیدن نظرات",
     "✍️ نوشتن نظر", "❓ راهنمای ربات", "🔄 بروزرسانی و رفع مشکل", "👤 پروفایل من",
+    "🎫 تیکت", "📣 اسپانسر و تبلیغ کانال", "📣 کانال رسمی",
     # پنل مدیریت
     "📊 آمار و گزارش", "📡 رصد فعالیت‌ها", "🔥 کاربران فعال",
     "📡 رصد زنده فعالیت‌ها", "🕵️ فعالیت یک کاربر", "📊 آمار رسانه",
@@ -1447,6 +1449,8 @@ vip_receipt_sessions: set[int] = set()  # کاربر در حال ارسال رس
 anon_sessions: dict[int, dict] = {}  # چت ناشناس: {user_id: {"step": "alias"|"target"|"msg", ...}}
 anon_reply_sessions: dict[int, str] = {}  # {user_id: token} — کاربر در حال نوشتن پاسخ ناشناس
 _anon_bot_username_cache: dict[str, object] = {"value": "", "at": 0.0}
+sponsor_sessions: dict[int, dict] = {}  # {user_id: {"step": "text"}} — تبلیغ‌دهنده در حال نوشتن تبلیغ
+sponsor_reply_sessions: dict[int, int] = {}  # {admin_id: sponsor_user_id} — پاسخ مدیر به تبلیغ‌دهنده
 duel_rooms: dict[str, dict] = {}  # اتاق‌های دوئل ۱v۱
 
 
@@ -2770,7 +2774,7 @@ def main_menu(user_id: int | None = None):
          InlineKeyboardButton(text="👤 پروفایل من", callback_data="profile_user")],
         [InlineKeyboardButton(text="👑 اشتراک پرمیوم", callback_data="vip_menu"),
          InlineKeyboardButton(text="🎟 کد هدیه", callback_data="gift_help")],
-        [InlineKeyboardButton(text="🧪 پنل آزمایشی مدیریت گروه", url=f"{MINI_APP_URL.split('/app')[0].rstrip('/')}/panel/")],
+        [InlineKeyboardButton(text="🛡 پنل مدیریت گروه", callback_data="group_center")],
         [InlineKeyboardButton(text="🎯 مأموریت‌های جایزه", callback_data="user_missions")],
         [InlineKeyboardButton(text="📖 معرفی سوپرربات", callback_data="about_bot")],
         [InlineKeyboardButton(text="💬 پشتیبانی و پیشنهاد", callback_data="support"),
@@ -2985,10 +2989,11 @@ async def show_ai_menu(message: types.Message) -> None:
 
 def support_reply_menu() -> ReplyKeyboardMarkup:
     return persistent_keyboard([
-        ["✍️ ارسال پیام پشتیبانی", "💬 نظرات کاربران"],
-        ["👤 پروفایل من", "❓ راهنمای ربات"],
-        ["📖 معرفی ربات", "🔄 بروزرسانی و رفع مشکل"],
-        ["🏠 منوی اصلی"],
+        ["✍️ ارسال پیام پشتیبانی", "🎫 تیکت"],
+        ["📣 اسپانسر و تبلیغ کانال", "📣 کانال رسمی"],
+        ["💬 نظرات کاربران", "👤 پروفایل من"],
+        ["❓ راهنمای ربات", "📖 معرفی ربات"],
+        ["🔄 بروزرسانی و رفع مشکل", "🏠 منوی اصلی"],
     ], "پشتیبانی Ajorpareh...")
 
 
@@ -7752,6 +7757,12 @@ async def cancel_guess(message: types.Message):
     elif user_id in anon_sessions:
         anon_sessions.pop(user_id, None)
         await message.answer("❌ ساخت پیام ناشناس لغو شد.", reply_markup=chat_reply_menu(user_id))
+    elif user_id in sponsor_sessions:
+        sponsor_sessions.pop(user_id, None)
+        await message.answer("❌ نوشتن تبلیغ لغو شد.", reply_markup=chat_reply_menu(user_id))
+    elif user_id in sponsor_reply_sessions:
+        sponsor_reply_sessions.pop(user_id, None)
+        await message.answer("❌ پاسخ به تبلیغ‌دهنده لغو شد.", reply_markup=admin_reply_menu())
     elif user_id in economy_setting_sessions:
         economy_setting_sessions.pop(user_id, None)
         await message.answer("❌ تغییر تنظیم اقتصادی لغو شد.")
@@ -8289,6 +8300,298 @@ async def anon_reply_callback(callback: types.CallbackQuery):
         parse_mode="HTML",
     )
     return await callback.answer("حالت پاسخ ناشناس فعال شد ✅")
+
+
+# ==================== مرکز مدیریت گروه 🛡 ====================
+
+def group_center_menu(user_id: int) -> InlineKeyboardMarkup:
+    """منوی مرکز مدیریت گروه — برای همهٔ کاربران (آزمایشی + VIP + پشتیبانی + تبلیغ)."""
+    rows = [
+        [InlineKeyboardButton(text="🧪 پنل آزمایشی مدیریت گروه (دمو)", url=f"{MINI_APP_URL.split('/app')[0].rstrip('/')}/panel/")],
+        [InlineKeyboardButton(text="👑 پنل VIP و خرید اشتراک", callback_data="vip_menu")],
+        [InlineKeyboardButton(text="🎫 تیکت و پشتیبانی", callback_data="support_center_menu"),
+         InlineKeyboardButton(text="📣 اسپانسر و تبلیغ کانال", callback_data="sponsor_start")],
+        [InlineKeyboardButton(text="➕ افزودن ربات به گروه", url=f"https://t.me/{SUPPORT_USERNAME}?startgroup=start"),
+         InlineKeyboardButton(text="📣 کانال رسمی", url=CHANNEL_LINK)],
+        [InlineKeyboardButton(text="📖 راهنمای مدیریت گروه", callback_data="group_guide")],
+    ]
+    if is_admin(user_id):
+        rows.append([InlineKeyboardButton(text="🛡 مدیریت گروه‌های من (واقعی)", callback_data="admin_group_panel")])
+    rows.append([InlineKeyboardButton(text="🔙 منوی اصلی", callback_data="back_main")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+@dp.callback_query(F.data == "group_guide")
+async def group_guide_callback(callback: types.CallbackQuery):
+    await callback.message.answer(
+        "📖 <b>راهنمای مدیریت گروه</b>\n\n"
+        "<b>۱. ربات رو به گروه اضافه کن</b>\n"
+        "دکمهٔ «➕ افزودن ربات به گروه» رو بزن، گروهت رو انتخاب کن و ربات رو <b>ادمین</b> کن.\n\n"
+        "<b>۲. پنل آزمایشی رو ببین</b>\n"
+        "همه قابلیت‌ها رو قبل از خرید در «🧪 پنل آزمایشی» امتحان کن.\n\n"
+        "<b>۳. اشتراک پرمیوم بگیر</b>\n"
+        "با اشتراک، این امکانات برای گروه واقعی‌ات فعال می‌شه:\n"
+        "🔐 ۱۲ قفل (لینک، استیکر، فوروارد، منشن، اسپویلر و...)\n"
+        "🛡 ضد اسپم و ضد تبلیغ · 🔇 خاموشی گروه\n"
+        "🧹 پاکسازی خودکار پیام‌ها · 🎉 قرعه‌کشی\n"
+        "📊 آمار کامل گروه · 👥 لینک دعوت اختصاصی\n\n"
+        "💡 اگه سؤالی داشتی، از «🎫 تیکت و پشتیبانی» بپرس!",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 مرکز مدیریت گروه", callback_data="group_center")],
+        ]),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "group_center")
+async def group_center_callback(callback: types.CallbackQuery):
+    await callback.message.answer(
+        "🛡 <b>مرکز مدیریت گروه</b>\n\n"
+        "همه‌چیز برای مدیریت گروه‌هات اینجاست 👇\n"
+        "• اول <b>پنل آزمایشی</b> رو ببین و همه قابلیت‌ها رو امتحان کن\n"
+        "• با <b>اشتراک پرمیوم</b> قفل‌ها، ضد اسپم و خاموشی برای گروه واقعی‌ات فعال می‌شه\n"
+        "• تبلیغ کانالت، تیکت و پشتیبانی هم از همین‌جا 👇",
+        parse_mode="HTML",
+        reply_markup=group_center_menu(callback.from_user.id),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "support_center_menu")
+async def support_center_callback(callback: types.CallbackQuery):
+    await callback.message.answer(
+        "💬 <b>پشتیبانی و ارتباط با ما</b>\n\n"
+        "• پیام‌هات مستقیم به مدیر می‌رسه و جوابش رو همین‌جا می‌گیری\n"
+        "• برای تبلیغ در کانال از بخش «اسپانسر و تبلیغ» استفاده کن",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📣 کانال رسمی @Ajor_pareh", url=CHANNEL_LINK)],
+            [InlineKeyboardButton(text="✍️ ارسال تیکت به پشتیبانی", callback_data="support_open_ticket")],
+            [InlineKeyboardButton(text="📣 اسپانسر و تبلیغ کانال", callback_data="sponsor_start")],
+            [InlineKeyboardButton(text="🔙 مرکز مدیریت گروه", callback_data="group_center")],
+        ]),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "support_open_ticket")
+async def support_open_ticket_callback(callback: types.CallbackQuery):
+    support_sessions.add(callback.from_user.id)
+    await callback.message.answer(
+        "🎫 <b>ثبت تیکت</b>\n\n"
+        "پیام/تیکتت رو بنویس؛ همراه آیدی تلگرامت مستقیم برای مدیر می‌ره و نتیجه همین‌جا بهت اعلام می‌شه.\n"
+        "/cancel برای انصراف",
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+# ==================== اسپانسر و تبلیغ کانال 📣 ====================
+
+async def start_sponsor_session(user_id: int, send_to) -> None:
+    """شروع فرم اسپانسر/تبلیغ: کاربر متن تبلیغش رو می‌نویسه."""
+    sponsor_sessions[user_id] = {"step": "text"}
+    await send_to.answer(
+        "📣 <b>اسپانسر و تبلیغ کانال</b>\n\n"
+        "متن تبلیغت رو بنویس (متن + لینک کانال/گروه/ربات خودت).\n"
+        "مثلاً:\n"
+        "<code>🎁 کانال آموزش برنامه‌نویسی با ۵۰٪ تخفیف ویژه\n👉 t.me/MyChannel</code>\n\n"
+        "📤 پیامت همراه مشخصاتت (اسم، آیدی، یوزرنیم) مستقیم برای مدیر ارسال می‌شه و مدیر برای هماهنگی قیمت و زمان، باهات تماس می‌گیره.\n"
+        "✅ بعد از تأیید مدیر، تبلیغت در کانال <b>@Ajor_pareh</b> منتشر می‌شه.\n"
+        "/cancel برای انصراف",
+        parse_mode="HTML",
+        reply_markup=chat_reply_menu(user_id),
+    )
+
+
+async def handle_sponsor_text(message: types.Message):
+    """پردازش متن تبلیغ (کاربر) و پاسخ مدیر به تبلیغ‌دهنده؛ اگر session نبود None برمی‌گرداند."""
+    user_id = message.from_user.id
+    text = (message.text or "").strip()
+
+    # --- پاسخ مدیر به تبلیغ‌دهنده ---
+    if user_id in sponsor_reply_sessions and is_admin(user_id):
+        if text in {"🏠 منوی اصلی", "منو", "منوی اصلی"}:
+            sponsor_reply_sessions.pop(user_id, None)
+            return await handle_menu_trigger(message)
+        target_user = sponsor_reply_sessions.pop(user_id, None)
+        if not text:
+            return await message.answer("❌ پیام خالی بود؛ دوباره بنویس یا /cancel.")
+        try:
+            await bot.send_message(
+                target_user,
+                f"📣 <b>پاسخ مدیر (دربارهٔ تبلیغ)</b>\n\n{html.escape(text[:2000])}",
+                parse_mode="HTML",
+            )
+            return await message.answer("✅ پیامت به تبلیغ‌دهنده ارسال شد.", reply_markup=admin_reply_menu())
+        except (TelegramForbiddenError, TelegramBadRequest):
+            return await message.answer("❌ ارسال نشد؛ احتمالاً کاربر ربات رو بلاک کرده.", reply_markup=admin_reply_menu())
+        except Exception as exc:
+            log.warning("sponsor reply failed: %s", exc)
+            return await message.answer("❌ ارسال ناموفق بود؛ دوباره تلاش کن.")
+
+    # --- کاربر در حال نوشتن متن تبلیغ ---
+    session = sponsor_sessions.get(user_id)
+    if not session:
+        return None
+    if text in {"🏠 منوی اصلی", "منو", "منوی اصلی"}:
+        sponsor_sessions.pop(user_id, None)
+        return await handle_menu_trigger(message)
+    if not text:
+        return await message.answer("❌ متن تبلیغ خالی بود؛ دوباره بنویس یا /cancel.", reply_markup=chat_reply_menu(user_id))
+    if len(text) > 2000:
+        return await message.answer("❌ متن تبلیغ حداکثر ۲۰۰۰ کاراکتر می‌تونه باشه؛ کوتاه‌ترش کن یا /cancel.", reply_markup=chat_reply_menu(user_id))
+    sponsor_sessions.pop(user_id, None)
+
+    req_id = uuid.uuid4().hex[:10]
+    username = message.from_user.username
+    name = message.from_user.full_name or f"کاربر {user_id}"
+    profile_link = f"https://t.me/{username}" if username else f"tg://user?id={user_id}"
+    await sponsor_requests_col.insert_one({
+        "_id": req_id,
+        "user_id": user_id,
+        "name": name[:120],
+        "username": username,
+        "profile_link": profile_link,
+        "text": text[:2000],
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc),
+    })
+
+    admin_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ تأیید و انتشار در کانال", callback_data=f"sponsor_approve:{req_id}")],
+        [InlineKeyboardButton(text="💬 پاسخ به تبلیغ‌دهنده", callback_data=f"sponsor_reply:{req_id}")],
+        [InlineKeyboardButton(text="❌ رد درخواست", callback_data=f"sponsor_reject:{req_id}")],
+    ])
+    for admin_id in ADMIN_IDS:
+        try:
+            await bot.send_message(
+                admin_id,
+                "📣 <b>درخواست تبلیغ جدید</b>\n\n"
+                f"👤 نام: <b>{html.escape(name)}</b>\n"
+                f"🆔 آیدی: <code>{user_id}</code>\n"
+                f"📛 یوزرنیم: @{html.escape(username or '—')}\n"
+                f"🔗 پروفایل: {profile_link}\n"
+                f"📅 {format_tehran_datetime(datetime.now(timezone.utc))}\n\n"
+                "━━━━━━━━━━━━━\n"
+                f"{html.escape(text[:2000])}\n"
+                "━━━━━━━━━━━━━\n\n"
+                "برای ارتباط مستقیم با تبلیغ‌دهنده از دکمهٔ «پاسخ» استفاده کن.",
+                parse_mode="HTML",
+                reply_markup=admin_kb,
+            )
+        except (TelegramForbiddenError, TelegramBadRequest):
+            pass
+        except Exception as exc:
+            log.warning("sponsor notify admin failed: %s", exc)
+
+    await log_activity(user_id, "sponsor_request", f"req={req_id}")
+    return await message.answer(
+        "✅ <b>درخواست تبلیغت ثبت شد!</b>\n\n"
+        "متن تبلیغت همراه مشخصاتت برای مدیر ارسال شد.\n"
+        "📞 مدیر برای هماهنگی (قیمت، زمان انتشار) باهات تماس می‌گیره.\n"
+        "بعد از تأیید، تبلیغت در کانال <b>@Ajor_pareh</b> منتشر می‌شه. 🎉",
+        parse_mode="HTML",
+        reply_markup=chat_reply_menu(user_id),
+    )
+
+
+@dp.callback_query(F.data == "sponsor_start")
+async def sponsor_start_callback(callback: types.CallbackQuery):
+    if callback.from_user.id in sponsor_sessions:
+        return await callback.answer("الان در حال نوشتن تبلیغ هستی؛ متن رو بفرست یا /cancel.", show_alert=True)
+    await start_sponsor_session(callback.from_user.id, callback.message)
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("sponsor_approve:"))
+async def sponsor_approve_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+    req_id = callback.data.split(":", 1)[1]
+    req = await sponsor_requests_col.find_one({"_id": req_id})
+    if not req:
+        return await callback.answer("درخواست پیدا نشد.", show_alert=True)
+    if req.get("status") != "pending":
+        return await callback.answer("این درخواست قبلاً بررسی شده.", show_alert=True)
+    name = req.get("name") or ""
+    username = req.get("username")
+    sig = f"@{username}" if username else html.escape(name)
+    published = False
+    try:
+        await bot.send_message(
+            CHANNEL_ID,
+            "📣 <b>تبلیغ</b>\n\n"
+            f"{html.escape(req.get('text') or '')[:3000]}\n\n"
+            f"— {sig}",
+            parse_mode="HTML",
+        )
+        published = True
+    except Exception as exc:
+        log.warning("sponsor publish failed: %s", exc)
+    await sponsor_requests_col.update_one(
+        {"_id": req_id},
+        {"$set": {"status": "approved", "published": published, "reviewed_by": callback.from_user.id, "reviewed_at": datetime.now(timezone.utc)}},
+    )
+    try:
+        await bot.send_message(
+            req["user_id"],
+            "✅ <b>تبلیغت تأیید شد!</b>\n\n"
+            + ("🎉 تبلیغت در کانال <b>@Ajor_pareh</b> منتشر شد!"
+               if published else
+               "📤 انتشار توسط مدیر انجام می‌شه؛ به‌زودی کانال رو چک کن."),
+            parse_mode="HTML",
+        )
+    except (TelegramForbiddenError, TelegramBadRequest):
+        pass
+    await callback.answer("✅ در کانال منتشر شد" if published else "✅ تأیید شد", show_alert=True)
+
+
+@dp.callback_query(F.data.startswith("sponsor_reject:"))
+async def sponsor_reject_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+    req_id = callback.data.split(":", 1)[1]
+    req = await sponsor_requests_col.find_one({"_id": req_id})
+    if not req:
+        return await callback.answer("درخواست پیدا نشد.", show_alert=True)
+    if req.get("status") != "pending":
+        return await callback.answer("این درخواست قبلاً بررسی شده.", show_alert=True)
+    await sponsor_requests_col.update_one(
+        {"_id": req_id},
+        {"$set": {"status": "rejected", "reviewed_by": callback.from_user.id, "reviewed_at": datetime.now(timezone.utc)}},
+    )
+    try:
+        await bot.send_message(
+            req["user_id"],
+            "❌ <b>درخواست تبلیغت رد شد.</b>\n\n"
+            "برای اطلاع از دلیل و هماهنگی دوباره، از «🎫 تیکت و پشتیبانی» پیام بفرست.",
+            parse_mode="HTML",
+        )
+    except (TelegramForbiddenError, TelegramBadRequest):
+        pass
+    await callback.answer("❌ رد شد", show_alert=True)
+
+
+@dp.callback_query(F.data.startswith("sponsor_reply:"))
+async def sponsor_reply_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+    req_id = callback.data.split(":", 1)[1]
+    req = await sponsor_requests_col.find_one({"_id": req_id})
+    if not req:
+        return await callback.answer("درخواست پیدا نشد.", show_alert=True)
+    sponsor_reply_sessions[callback.from_user.id] = req["user_id"]
+    await callback.message.answer(
+        "💬 <b>پاسخ به تبلیغ‌دهنده</b>\n\n"
+        f"👤 {html.escape(req.get('name') or '')} · <code>{req['user_id']}</code>\n"
+        f"🔗 {req.get('profile_link', '')}\n\n"
+        "پیامت رو بنویس؛ مستقیم برای تبلیغ‌دهنده ارسال می‌شه. /cancel",
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
 
 @dp.message(F.text.func(lambda t: t and t.isdigit()))
 async def handle_numeric_input(message: types.Message):
@@ -17295,6 +17598,12 @@ async def handle_text(message: types.Message):
         if result is not None:
             return
 
+    # اسپانسر/تبلیغ — پاسخ مدیر و متن تبلیغ کاربر
+    if user_id in sponsor_reply_sessions or user_id in sponsor_sessions:
+        result = await handle_sponsor_text(message)
+        if result is not None:
+            return
+
     # پاک‌سازی خودکار پیام دکمه‌های ReplyKeyboard — چت شلوغ نشه
     if text in REPLY_BUTTON_LABELS:
         asyncio.create_task(_auto_delete_button_msg(message, 0.3))
@@ -18180,6 +18489,13 @@ async def handle_text(message: types.Message):
     # زیرمنوی پشتیبانی
     if text == "👤 پروفایل من": return await profile_command(message)
     if text == "✍️ ارسال پیام پشتیبانی": support_sessions.add(user_id); return await message.answer("پیامت رو بفرست؛ همراه آیدی تلگرامت مستقیم برای مدیر می‌ره. /cancel", reply_markup=support_reply_menu())
+    if text == "🎫 تیکت":
+        support_sessions.add(user_id)
+        return await message.answer("🎫 پیام تیکتت رو بنویس؛ همراه آیدی تلگرامت برای مدیر می‌ره و نتیجه همین‌جا اعلام می‌شه. /cancel", reply_markup=support_reply_menu())
+    if text == "📣 اسپانسر و تبلیغ کانال":
+        return await start_sponsor_session(user_id, message)
+    if text == "📣 کانال رسمی":
+        return await message.answer(f"📣 <b>کانال رسمی آجُرپاره</b>\n\n{CHANNEL_LINK}\n\nعضویت کن و داغ‌ترین‌ها رو ببین! 🔥", parse_mode="HTML", reply_markup=support_reply_menu())
     if text == "💬 نظرات کاربران": return await message.answer("نظرها و بازخوردها:", reply_markup=reviews_reply_menu())
     if text == "👀 دیدن نظرات": return await send_reviews_to_bot(message)
     if text == "✍️ نوشتن نظر":
@@ -18380,7 +18696,7 @@ async def handle_text(message: types.Message):
         await ai_msg.edit_text(random.choice(FUNNY_FALLBACKS))
 
 def clear_user_transient_sessions(user_id: int):
-    for collection in [guess_games, hit_run_sessions, memory_games, twenty_one_games, calculator_sessions, broadcast_targets, config_upload_sessions, admin_search_sessions, admin_role_sessions, economy_setting_sessions, reschedule_sessions, ticket_reply_sessions, manual_balance_sessions, ai_sessions, casual_chat_history, promo_sticker_sessions, service_shop_setting_sessions, service_delivery_sessions, service_receipt_sessions, media_request_sessions, prompt_image_sessions, music_search_sessions, music_recognize_sessions, music_playlist_upload_sessions, music_search_cache, quick_quiz_recent, tts_sessions, short_sessions, summarize_sessions, instant_repost_sessions, repost_edit_sessions, scheduled_add_sessions, scheduled_edit_sessions, greeting_add_sessions, greeting_edit_sessions, anon_sessions]:
+    for collection in [guess_games, hit_run_sessions, memory_games, twenty_one_games, calculator_sessions, broadcast_targets, config_upload_sessions, admin_search_sessions, admin_role_sessions, economy_setting_sessions, reschedule_sessions, ticket_reply_sessions, manual_balance_sessions, ai_sessions, casual_chat_history, promo_sticker_sessions, service_shop_setting_sessions, service_delivery_sessions, service_receipt_sessions, media_request_sessions, prompt_image_sessions, music_search_sessions, music_recognize_sessions, music_playlist_upload_sessions, music_search_cache, quick_quiz_recent, tts_sessions, short_sessions, summarize_sessions, instant_repost_sessions, repost_edit_sessions, scheduled_add_sessions, scheduled_edit_sessions, greeting_add_sessions, greeting_edit_sessions, anon_sessions, sponsor_sessions, sponsor_reply_sessions]:
         collection.pop(user_id, None)
     for collection in [broadcast_sessions, withdrawal_sessions, support_sessions, review_sessions, caption_sessions, channel_add_sessions, engagement_post_sessions, repost_sessions, schedule_time_sessions, repost_cta_sessions, promo_create_sessions, gift_redeem_sessions, mission_create_sessions, raffle_create_sessions, prediction_create_sessions, template_create_sessions, qr_sessions, daily_fal_channel_sessions, greeting_target_sessions, music_daily_target_sessions, music_daily_time_sessions, sticker_sessions, gif_sessions, reminder_sessions, anon_reply_sessions]:
         collection.discard(user_id)
@@ -18897,14 +19213,23 @@ async def require_group_admin(chat_id: int, user_id: int) -> bool:
 async def admin_group_panel_callback(callback: types.CallbackQuery):
     if not is_admin(callback.from_user.id):
         return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+    chats = await managed_chats_col.find({"status": {"$in": ["administrator", "creator", "member", "active"]}}).sort("updated_at", -1).limit(30).to_list(length=30)
+    rows = []
+    for chat in chats:
+        title = chat.get("title") or str(chat["_id"])
+        rows.append([InlineKeyboardButton(
+            text=f"{'📣' if chat.get('type') == 'channel' else '👥'} {title[:40]}",
+            callback_data=f"gpanel:{chat['_id']}",
+        )])
+    if not rows:
+        rows.append([InlineKeyboardButton(text="➕ افزودن ربات به گروه", url=f"https://t.me/{SUPPORT_USERNAME}?startgroup=start")])
+    rows.append([InlineKeyboardButton(text="🔙 مرکز مدیریت گروه", callback_data="group_center")])
     await callback.message.answer(
         "🛡 <b>پنل مدیریت گروه‌ها</b>\n\n"
         "ربات را به گروه/سوپرگروه خود اضافه کنید و آن را ادمین کنید.\n"
         "سپس یکی از گروه‌های زیر را انتخاب کنید:",
         parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔙 پنل مدیریت", callback_data="admin_panel")],
-        ]),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
     )
     await callback.answer()
 
@@ -19555,6 +19880,7 @@ async def initialize_database():
         group_settings_col.create_index("_id"),
         anon_messages_col.create_index([("sender_id", 1), ("created_at", -1)]),
         anon_messages_col.create_index("created_at", expireAfterSeconds=60 * 60 * 24 * 30),
+        sponsor_requests_col.create_index([("status", 1), ("created_at", -1)]),
     )
 
 

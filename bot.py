@@ -2770,6 +2770,7 @@ def main_menu(user_id: int | None = None):
          InlineKeyboardButton(text="👤 پروفایل من", callback_data="profile_user")],
         [InlineKeyboardButton(text="👑 اشتراک پرمیوم", callback_data="vip_menu"),
          InlineKeyboardButton(text="🎟 کد هدیه", callback_data="gift_help")],
+        [InlineKeyboardButton(text="🧪 پنل آزمایشی مدیریت گروه", url=f"{MINI_APP_URL.split('/app')[0].rstrip('/')}/panel/")],
         [InlineKeyboardButton(text="🎯 مأموریت‌های جایزه", callback_data="user_missions")],
         [InlineKeyboardButton(text="📖 معرفی سوپرربات", callback_data="about_bot")],
         [InlineKeyboardButton(text="💬 پشتیبانی و پیشنهاد", callback_data="support"),
@@ -4106,6 +4107,15 @@ async def start(message: types.Message):
             token = text_parts[1][len("anon_"):].strip()
             if token:
                 return await show_anon_message(message, token)
+        if text_parts[1].startswith("vip_"):
+            # لینک خرید از پنل آزمایشی: t.me/Ajorparehbot?start=vip_<months>
+            try:
+                months = int(text_parts[1].split("_", 1)[1])
+            except (ValueError, IndexError):
+                months = 0
+            if vip_service.plan_by_months(months):
+                await _vip_start_purchase(user_id, months, message)
+                return
 
     await log_activity(user_id, "start", "استارت ربات")
 
@@ -18334,7 +18344,10 @@ def vip_plans_keyboard() -> InlineKeyboardMarkup:
             text=f"{plan['emoji']} {plan['title']} — {plan['price']:,} تومان",
             callback_data=f"vip_choose:{plan['months']}",
         )])
-    rows.append([InlineKeyboardButton(text="🔍 مشاهده پنل آزمایشی (دمو)", web_app=WebAppInfo(url=f"{MINI_APP_URL.split('/app')[0]}/panel/"))])
+    rows.append([
+        InlineKeyboardButton(text="🧪 پنل آزمایشی (دمو)", web_app=WebAppInfo(url=f"{MINI_APP_URL.split('/app')[0]}/panel/")),
+        InlineKeyboardButton(text="🌐 باز در مرورگر", url=f"{MINI_APP_URL.split('/app')[0]}/panel/"),
+    ])
     rows.append([InlineKeyboardButton(text="🔙 منوی اصلی", callback_data="back_main")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -18387,21 +18400,22 @@ async def vip_send_receipt_callback(callback: types.CallbackQuery):
     await callback.answer()
 
 
-@dp.callback_query(F.data.startswith("vip_choose:"))
-async def vip_choose_callback(callback: types.CallbackQuery):
-    try:
-        months = int(callback.data.split(":", 1)[1])
-    except (ValueError, IndexError):
-        return await callback.answer("پلن نامعتبر است.", show_alert=True)
+async def _vip_start_purchase(user_id: int, months: int, message: types.Message) -> bool:
+    """جریان خرید اشتراک: ساخت سفارش، پیش‌فاکتور برای کاربر و اطلاع به ادمین‌ها.
+
+    هم از دکمهٔ «👑 اشتراک پرمیوم» (callback) و هم از لینک پنل آزمایشی
+    (t.me/Ajorparehbot?start=vip_<months>) استفاده می‌شود.
+    """
     plan = vip_service.plan_by_months(months)
     if not plan:
-        return await callback.answer("پلن نامعتبر است.", show_alert=True)
+        return False
     try:
-        order = await vip_service.create_order(callback.from_user.id, months)
+        order = await vip_service.create_order(user_id, months)
     except ValueError as exc:
         code, msg = exc.args
-        return await callback.answer(msg, show_alert=True)
-    await callback.message.answer(
+        await message.answer(f"⚠️ {msg}")
+        return False
+    await message.answer(
         f"🧾 <b>پیش‌فاکتور خرید اشتراک</b>\n\n"
         f"{plan['emoji']} پلن: <b>{plan['title']}</b>\n"
         f"💰 مبلغ: <b>{plan['price']:,} تومان</b>\n"
@@ -18420,7 +18434,7 @@ async def vip_choose_callback(callback: types.CallbackQuery):
             await bot.send_message(
                 admin_id,
                 f"🛒 <b>درخواست خرید اشتراک جدید</b>\n\n"
-                f"👤 کاربر: <code>{callback.from_user.id}</code>\n"
+                f"👤 کاربر: <code>{user_id}</code>\n"
                 f"{plan['emoji']} پلن: {plan['title']}\n"
                 f"💰 مبلغ: {plan['price']:,} تومان\n"
                 f"🆔 کد سفارش: <code>{order['_id']}</code>",
@@ -18431,6 +18445,18 @@ async def vip_choose_callback(callback: types.CallbackQuery):
             )
         except (TelegramForbiddenError, TelegramBadRequest):
             pass
+    return True
+
+
+@dp.callback_query(F.data.startswith("vip_choose:"))
+async def vip_choose_callback(callback: types.CallbackQuery):
+    try:
+        months = int(callback.data.split(":", 1)[1])
+    except (ValueError, IndexError):
+        return await callback.answer("پلن نامعتبر است.", show_alert=True)
+    if not vip_service.plan_by_months(months):
+        return await callback.answer("پلن نامعتبر است.", show_alert=True)
+    await _vip_start_purchase(callback.from_user.id, months, callback.message)
     await callback.answer("سفارش ثبت شد ✅")
 
 

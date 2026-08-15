@@ -43,8 +43,8 @@ MUSIC_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126 Safari
 # سرویس‌های Cobalt برای دانلود یوتیوب (زمانی که yt-dlp از IP سرور بلاک باشد).
 # اولی بدون Turnstile است؛ بقیه گاهی باز می‌شوند.
 COBALT_INSTANCES = [
-    "https://api.cobalt.liubquanti.click",
     "https://rue-cobalt.xenon.zone",
+    "https://api.cobalt.liubquanti.click",
     "https://cobaltapi.cjs.nz",
 ]
 PIPED_INSTANCES = [
@@ -539,7 +539,10 @@ async def download_preview(session: aiohttp.ClientSession, preview_url: str, out
 # ============ YouTube via Cobalt (public download API) ============
 
 async def _cobalt_request(session: aiohttp.ClientSession, inst: str, url: str, mode: str, quality: str | None = None) -> dict[str, Any]:
-    payload: dict[str, Any] = {"url": str(url).strip()[:1000], "downloadMode": mode}
+    # در نسخه‌های جدید Cobalt مقدار "video" معتبر نیست؛ "auto" ویدیو/صوت را برمی‌گرداند
+    # و videoQuality کیفیت را کنترل می‌کند. برای "audio" هم "auto" + audioFormat جواب می‌دهد.
+    api_mode = "auto" if mode in ("video", "audio") else mode
+    payload: dict[str, Any] = {"url": str(url).strip()[:1000], "downloadMode": api_mode}
     if mode == "audio":
         payload["audioFormat"] = "mp3"
     if quality:

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>پنل مدیریت گروه — آجُرپاره</title>
+<style>
+:root {
+  --bg: #0b0a0f; --card: #15141d; --card2: #1c1a26; --text: #eee;
+  --muted: #9a97a8; --accent: #7c5cff; --green: #3ddc84; --red: #ff5c7a;
+  --yellow: #ffc857; --border: rgba(255,255,255,.08);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',Tahoma,sans-serif; padding:16px; padding-bottom:90px; }
+.header { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
+.logo { width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg,#7c5cff,#5a3dff); display:flex; align-items:center; justify-content:center; font-size:24px; }
+.header h1 { font-size:18px; }
+.header p { font-size:12px; color:var(--muted); }
+.badge { display:inline-block; background:rgba(124,92,255,.2); color:var(--accent); border:1px solid rgba(124,92,255,.4); padding:3px 10px; border-radius:20px; font-size:11px; }
+.badge.days { background:rgba(61,220,132,.15); color:var(--green); border-color:rgba(61,220,132,.3); }
+.trial-banner { background:linear-gradient(135deg,rgba(124,92,255,.15),rgba(61,220,132,.1)); border:1px solid rgba(124,92,255,.3); border-radius:14px; padding:14px; margin-bottom:16px; font-size:13px; }
+.trial-banner b { color:var(--green); }
+.card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:14px; }
+.card h2 { font-size:15px; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.section-title { font-size:12px; color:var(--muted); margin:18px 0 8px; font-weight:600; }
+.row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); }
+.row:last-child { border-bottom:none; }
+.row .label { font-size:13px; }
+.row .desc { font-size:11px; color:var(--muted); margin-top:2px; }
+.lock { width:44px; height:24px; border-radius:20px; background:var(--card2); border:1px solid var(--border); position:relative; transition:.2s; cursor:pointer; }
+.lock.active { background:var(--green); }
+.lock::after { content:""; position:absolute; width:18px; height:18px; border-radius:50%; background:#fff; top:2px; right:2px; transition:.2s; }
+.lock.active::after { right:22px; }
+.btn { display:block; width:100%; padding:13px; border:none; border-radius:12px; background:var(--accent); color:#fff; font-size:14px; font-weight:600; cursor:pointer; margin-top:6px; font-family:inherit; }
+.btn.secondary { background:var(--card2); color:var(--text); border:1px solid var(--border); }
+.btn.green { background:var(--green); color:#000; }
+.stats-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.stat { background:var(--card2); border-radius:12px; padding:12px; text-align:center; }
+.stat b { font-size:18px; display:block; }
+.stat span { font-size:11px; color:var(--muted); }
+.vip-note { background:rgba(61,220,132,.08); border:1px solid rgba(61,220,132,.2); border-radius:12px; padding:12px; font-size:12px; color:var(--green); margin-top:10px; }
+.plans { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.plan { background:var(--card2); border:1px solid var(--border); border-radius:14px; padding:14px; text-align:center; cursor:pointer; transition:.2s; }
+.plan:hover { border-color:var(--accent); transform:translateY(-2px); }
+.plan.best { border-color:var(--accent); background:rgba(124,92,255,.1); }
+.plan .price { font-size:17px; font-weight:700; color:var(--accent); margin:6px 0; }
+.plan .per { font-size:11px; color:var(--muted); }
+.demo-note { font-size:11px; color:var(--muted); text-align:center; margin-top:14px; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">🧱</div>
+    <div>
+      <h1>آجُرپاره | پنل مدیریت گروه</h1>
+      <p>مدیریت حرفه‌ای گروه‌ها و سوپرگروه‌ها</p>
+    </div>
+  </div>
+
+  <div class="trial-banner">
+    🔍 این یک <b>پنل آزمایشی (دمو)</b> است — برای مشاهدهٔ امکانات قبل از خرید اشتراک.
+    با خرید اشتراک پرمیوم، همهٔ این قابلیت‌ها برای گروه شما <b>فعال</b> می‌شود.
+  </div>
+
+  <div class="badge days" id="vipStatus">👑 وضعیت: نمایشی — برای فعال‌سازی اشتراک بخرید</div>
+
+  <div class="section-title">📊 آمار و وضعیت کلی گروه</div>
+  <div class="card">
+    <div class="stats-grid">
+      <div class="stat"><b id="statMsg">۱۲۴</b><span>پیام امروز</span></div>
+      <div class="stat"><b id="statUser">۴۸</b><span>کاربر فعال</span></div>
+      <div class="stat"><b id="statInv">۳</b><span>دعوت ثبت‌شده</span></div>
+    </div>
+    <div class="vip-note" id="demoNote">این آمار نمونه است — با اشتراک پرمیوم، آمار واقعی گروه شما نمایش داده می‌شود.</div>
+  </div>
+
+  <div class="section-title">🔐 قفل‌ها</div>
+  <div class="card">
+    <div id="locksList"></div>
+    <div class="demo-note">تغییرات فقط در حالت آزمایشی است؛ با خرید اشتراک روی گروه واقعی شما اعمال می‌شود.</div>
+  </div>
+
+  <div class="section-title">💎 امکانات ویژه</div>
+  <div class="card">
+    <div class="row"><div><div class="label">🧹 پاکسازی خودکار پیام</div><div class="desc">حذف خودکار پیام‌های قدیمی</div></div><div class="lock active"></div></div>
+    <div class="row"><div><div class="label">🎉 قرعه‌کشی گروه</div><div class="desc">برنده‌گیری تصادفی بین اعضا</div></div><div class="lock active"></div></div>
+    <div class="row"><div><div class="label">📊 آمار کامل گروه</div><div class="desc">پیام‌ها، کاربران فعال، برترین‌ها</div></div><div class="lock active"></div></div>
+    <div class="row"><div><div class="label">🔗 لینک دعوت اختصاصی</div><div class="desc">ردیابی دعوت‌ها + پاداش</div></div><div class="lock active"></div></div>
+    <div class="row"><div><div class="label">⛔ ضد اسپم هوشمند</div><div class="desc">محدودیت پیام + ضد تبچی</div></div><div class="lock active"></div></div>
+    <div class="row"><div><div class="label">💤 خاموشی زمان‌بندی‌شده</div><div class="desc">خاموش/روشن خودکار</div></div><div class="lock active"></div></div>
+  </div>
+
+  <div class="section-title">👑 پلن‌های اشتراک</div>
+  <div class="plans">
+    <div class="plan" onclick="buyPlan(1)"><div>🥉 یک ماهه</div><div class="price">۹۹٬۰۰۰</div><div class="per">تومان</div></div>
+    <div class="plan" onclick="buyPlan(3)"><div>🥈 سه ماهه</div><div class="price">۲۳۹٬۰۰۰</div><div class="per">تومان</div></div>
+    <div class="plan best" onclick="buyPlan(6)"><div>🥇 شش ماهه ⭐</div><div class="price">۴۲۹٬۰۰۰</div><div class="per">تومان</div></div>
+    <div class="plan" onclick="buyPlan(12)"><div>👑 یک ساله</div><div class="price">۵۸۷٬۰۰۰</div><div class="per">تومان</div></div>
+  </div>
+
+  <button class="btn green" onclick="buyPlan(6)">🛒 خرید اشتراک پرمیوم</button>
+  <button class="btn secondary" onclick="openBot()">🤖 خرید از داخل ربات</button>
+  <div class="demo-note">© آجُرپاره — نسخهٔ نمایشی</div>
+
+<script>
+const LOCKS = [
+  ["sticker","استیکر"], ["gif","گیف"], ["video","ویدئو"], ["photo","تصویر"],
+  ["audio","موزیک"], ["voice","ویس"], ["video_note","ویدئو گرد"], ["link","لینک"],
+  ["mention","منشن"], ["forward","فوروارد"], ["spoiler","اسپویلر"], ["document","فایل"]
+];
+const locksEl = document.getElementById("locksList");
+LOCKS.forEach(([key,label]) => {
+  const row = document.createElement("div");
+  row.className = "row";
+  row.innerHTML = `<div><div class="label">${label}</div><div class="desc">کاربر عادی قفل — ویژه آزاد</div></div><div class="lock" data-key="${key}"></div>`;
+  row.querySelector(".lock").addEventListener("click", function(){ this.classList.toggle("active"); });
+  locksEl.appendChild(row);
+});
+
+function buyPlan(months) {
+  if (window.Telegram?.WebApp) {
+    window.Telegram.WebApp.close();
+  }
+  const botUrl = "https://t.me/Ajorparehbot";
+  window.open(`${botUrl}?start=vip_${months}`, "_blank");
+}
+function openBot() {
+  window.open("https://t.me/Ajorparehbot", "_blank");
+}
+if (window.Telegram?.WebApp) {
+  window.Telegram.WebApp.ready();
+  window.Telegram.WebApp.expand();
+}
+</script>
+</body>
+</html>

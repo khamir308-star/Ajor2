@@ -2033,5 +2033,57 @@ class AsyncCoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(group_guard.classify_message(fwd_msg), "forward")
 
 
+
+    def test_group_raffle_flow(self):
+        """🎉 جریان قرعه‌کشی گروه: ساخت، شرکت، برنده‌گیری."""
+        import asyncio as _aio
+
+        class FakeRaffles:
+            def __init__(self):
+                self.store = {}
+            async def insert_one(self, doc):
+                self.store[doc["_id"]] = doc
+            async def find_one(self, q, *a, **k):
+                rid = q.get("_id")
+                return self.store.get(rid)
+            async def update_one(self, q, upd, **k):
+                rid = q.get("_id")
+                if rid in self.store:
+                    if "$push" in upd:
+                        self.store[rid]["entries"].append(upd["$push"]["entries"])
+                    if "$set" in upd:
+                        self.store[rid].update(upd["$set"])
+
+        async def run():
+            bot.raffles_col = FakeRaffles()
+            raffle = await group_guard.create_raffle(12345, winners=1)
+            await group_guard.join_raffle(raffle["_id"], 111)
+            await group_guard.join_raffle(raffle["_id"], 222)
+            await group_guard.join_raffle(raffle["_id"], 111)  # تکراری — رد می‌شود
+            self.assertEqual(len(raffle["entries"]), 2)
+            winners = await group_guard.draw_raffle(raffle["_id"])
+            self.assertEqual(len(winners), 1)
+            self.assertIn(winners[0], [111, 222])
+
+        _aio.run(run())
+
+    def test_group_cleanup_config(self):
+        """🧹 پاکسازی خودکار: مقادیر پیش‌فرض و فعال‌سازی."""
+        config = group_guard.get_group_config(12345)
+        # چون async است با asyncio.run تست می‌کنیم
+        import asyncio as _aio2
+        class FakeCol:
+            async def find_one(self, q, *a, **k):
+                return None
+            async def update_one(self, *a, **k):
+                return None
+        async def run():
+            group_guard.group_settings_col = FakeCol()
+            cfg = await group_guard.get_group_config(12345)
+            self.assertIn("cleanup", cfg)
+            self.assertFalse(cfg["cleanup"]["enabled"])
+            self.assertEqual(cfg["cleanup"]["after_minutes"], 60)
+        _aio2.run(run())
+
 if __name__ == "__main__":
     unittest.main()

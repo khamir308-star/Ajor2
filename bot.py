@@ -264,6 +264,10 @@ reviews_col = db["user_reviews"]
 media_jobs_col = db["media_jobs"]
 media_file_cache_col = db["media_file_cache"]  # کش file_id بر اساس URL (برای جلوگیری از دانلود تکراری)
 vip_orders_col = db["vip_orders"]  # سفارش‌های خرید اشتراک پرمیوم
+cleanup_messages_col = db["cleanup_messages"]  # پیام‌های ربات برای پاکسازی خودکار
+group_stats_col = db["group_stats"]  # آمار پیام‌های گروه
+raffles_col = db["group_raffles"]  # قرعه‌کشی‌های گروه
+invite_stats_col = db["invite_stats"]  # آمار دعوت‌های اختصاصی
 
 # اتصال ماژول vip_service به کالکشن‌ها
 vip_service.users_col = users_col
@@ -17933,6 +17937,7 @@ def vip_plans_keyboard() -> InlineKeyboardMarkup:
             text=f"{plan['emoji']} {plan['title']} — {plan['price']:,} تومان",
             callback_data=f"vip_choose:{plan['months']}",
         )])
+    rows.append([InlineKeyboardButton(text="🔍 مشاهده پنل آزمایشی (دمو)", web_app=WebAppInfo(url=f"{MINI_APP_URL.split('/app')[0]}/panel/"))])
     rows.append([InlineKeyboardButton(text="🔙 منوی اصلی", callback_data="back_main")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -18252,6 +18257,10 @@ def group_panel_kb(chat_id: int) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🔐 قفل‌ها", callback_data=f"glocks:{chat_id}")],
         [InlineKeyboardButton(text="⛔ ضد اسپم", callback_data=f"gspam:{chat_id}")],
         [InlineKeyboardButton(text="💤 خاموشی", callback_data=f"gshut:{chat_id}")],
+        [InlineKeyboardButton(text="🧹 پاکسازی خودکار", callback_data=f"gclean:{chat_id}")],
+        [InlineKeyboardButton(text="🎉 قرعه‌کشی", callback_data=f"graffle:{chat_id}")],
+        [InlineKeyboardButton(text="📊 آمار گروه", callback_data=f"gstats:{chat_id}")],
+        [InlineKeyboardButton(text="🔗 لینک دعوت اختصاصی", callback_data=f"ginvite:{chat_id}")],
         [InlineKeyboardButton(text="👑 کاربران ویژه", callback_data=f"gvip:{chat_id}")],
         [InlineKeyboardButton(text="🔙 پنل مدیریت", callback_data="admin_panel")],
     ])
@@ -18419,6 +18428,212 @@ async def gvip_callback(callback: types.CallbackQuery):
         ]),
     )
     await callback.answer()
+
+
+# ================== پاکسازی خودکار پیام ==================
+
+@dp.callback_query(F.data.startswith("gclean:"))
+async def gclean_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    chat_id = int(callback.data.split(":", 1)[1])
+    config = await group_guard.get_group_config(chat_id)
+    cleanup = config.get("cleanup") or {}
+    status = "✅ فعال" if cleanup.get("enabled") else "⛔ غیرفعال"
+    await callback.message.answer(
+        f"🧹 <b>پاکسازی خودکار پیام</b>\n\n"
+        f"وضعیت: {status}\n"
+        f"⏱ بعد از: {cleanup.get('after_minutes', 60)} دقیقه\n\n"
+        "پیام‌های ربات (اعلان‌ها و پاسخ‌ها) بعد از مدت تعیین‌شده خودکار حذف می‌شوند تا گروه تمیز بماند.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 فعال/غیرفعال", callback_data=f"gcleant:{chat_id}")],
+            [InlineKeyboardButton(text="⏱ ۳۰ دقیقه", callback_data=f"gcleanc:{chat_id}:30"),
+             InlineKeyboardButton(text="⏱ ۱ ساعت", callback_data=f"gcleanc:{chat_id}:60")],
+            [InlineKeyboardButton(text="⏱ ۳ ساعت", callback_data=f"gcleanc:{chat_id}:180"),
+             InlineKeyboardButton(text="⏱ ۲۴ ساعت", callback_data=f"gcleanc:{chat_id}:1440")],
+            [InlineKeyboardButton(text="🔙 پنل گروه", callback_data=f"gpanel:{chat_id}")],
+        ]),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("gcleant:"))
+async def gcleant_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    chat_id = int(callback.data.split(":", 1)[1])
+    config = await group_guard.get_group_config(chat_id)
+    config["cleanup"]["enabled"] = not config["cleanup"].get("enabled", False)
+    await group_guard.save_group_config(chat_id, {"cleanup": config["cleanup"]})
+    await gclean_callback(callback)
+    await callback.answer("✅ ذخیره شد")
+
+
+@dp.callback_query(F.data.startswith("gcleanc:"))
+async def gcleanc_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    _, chat_id_s, minutes = callback.data.split(":", 2)
+    chat_id = int(chat_id_s)
+    config = await group_guard.get_group_config(chat_id)
+    config["cleanup"]["after_minutes"] = int(minutes)
+    await group_guard.save_group_config(chat_id, {"cleanup": config["cleanup"]})
+    await gclean_callback(callback)
+    await callback.answer("✅ ذخیره شد")
+
+
+# ================== قرعه‌کشی ==================
+
+@dp.callback_query(F.data.startswith("graffle:"))
+async def graffle_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    chat_id = int(callback.data.split(":", 1)[1])
+    await callback.message.answer(
+        "🎉 <b>قرعه‌کشی گروه</b>\n\n"
+        "قرعه‌کشی بسازید تا اعضای گروه با زدن دکمه شرکت کنند و برنده به‌صورت تصادفی انتخاب شود.\n\n"
+        "چند برنده؟ (۱، ۲ یا ۳)",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="۱ برنده", callback_data=f"grafflec:{chat_id}:1"),
+             InlineKeyboardButton(text="۲ برنده", callback_data=f"grafflec:{chat_id}:2")],
+            [InlineKeyboardButton(text="۳ برنده", callback_data=f"grafflec:{chat_id}:3")],
+            [InlineKeyboardButton(text="🔙 پنل گروه", callback_data=f"gpanel:{chat_id}")],
+        ]),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("grafflec:"))
+async def grafflec_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    _, chat_id_s, winners = callback.data.split(":", 2)
+    chat_id = int(chat_id_s)
+    raffle = await group_guard.create_raffle(chat_id, int(winners))
+    # ارسال پیام قرعه‌کشی به گروه
+    try:
+        await bot.send_message(
+            chat_id,
+            f"{raffle['text']}\n\n"
+            f"🎯 {winners} برنده · برای شرکت دکمهٔ زیر را بزن",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🎟 شرکت در قرعه‌کشی", callback_data=f"grafflejoin:{raffle['_id']}")],
+                [InlineKeyboardButton(text="🎲 اعلام برندگان", callback_data=f"graffledraw:{raffle['_id']}")],
+            ]),
+        )
+    except (TelegramForbiddenError, TelegramBadRequest) as exc:
+        log.warning("raffle send failed: %s", exc)
+    await callback.message.answer(f"✅ قرعه‌کشی ساخته شد.\n🆔 <code>{raffle['_id']}</code>", parse_mode="HTML")
+    await callback.answer("✅ ساخته شد")
+
+
+@dp.callback_query(F.data.startswith("grafflejoin:"))
+async def grafflejoin_callback(callback: types.CallbackQuery):
+    raffle_id = callback.data.split(":", 1)[1]
+    ok = await group_guard.join_raffle(raffle_id, callback.from_user.id)
+    if ok:
+        await callback.answer("🎟 در قرعه‌کشی شرکت کردید!")
+    else:
+        await callback.answer("شما قبلاً شرکت کرده‌اید.", show_alert=True)
+
+
+@dp.callback_query(F.data.startswith("graffledraw:"))
+async def graffledraw_callback(callback: types.CallbackQuery):
+    raffle_id = callback.data.split(":", 1)[1]
+    raffle = await raffles_col.find_one({"_id": raffle_id})
+    if not raffle:
+        return await callback.answer("قرعه‌کشی پیدا نشد.", show_alert=True)
+    if not is_admin(callback.from_user.id) and callback.from_user.id not in (raffle.get("entries") or []):
+        return await callback.answer("فقط مدیر می‌تواند برنده را اعلام کند.", show_alert=True)
+    winners = await group_guard.draw_raffle(raffle_id)
+    if not winners:
+        return await callback.answer("هنوز کسی شرکت نکرده است.", show_alert=True)
+    mentions = " ".join(f"<a href=\"tg://user?id={uid}\">برنده</a>" for uid in winners)
+    try:
+        await bot.send_message(
+            raffle["chat_id"],
+            f"🎉 <b>برندگان قرعه‌کشی!</b>\n\n{mentions}\n\n🎊 تبریک!",
+            parse_mode="HTML",
+        )
+    except (TelegramForbiddenError, TelegramBadRequest) as exc:
+        log.warning("raffle draw send failed: %s", exc)
+    await callback.answer("🎲 برندگان اعلام شدند")
+
+
+# ================== آمار گروه ==================
+
+@dp.callback_query(F.data.startswith("gstats:"))
+async def gstats_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    chat_id = int(callback.data.split(":", 1)[1])
+    stats = await group_guard.group_stats(chat_id, days=7)
+    lines = [
+        "📊 <b>آمار گروه (۷ روز اخیر)</b>",
+        "",
+        f"💬 کل پیام‌ها: <b>{stats['total_messages']:,}</b>",
+        f"👥 کاربران فعال: <b>{stats['active_users']}</b>",
+        "",
+        "🏆 <b>برترین‌ها:</b>",
+    ]
+    for i, item in enumerate(stats["top_users"][:5], 1):
+        lines.append(f"{i}. <code>{item['user_id']}</code> — {item['count']} پیام")
+    await callback.message.answer("\n".join(lines), parse_mode="HTML",
+                                  reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                                      [InlineKeyboardButton(text="🔙 پنل گروه", callback_data=f"gpanel:{chat_id}")],
+                                  ]))
+    await callback.answer()
+
+
+# ================== لینک دعوت اختصاصی ==================
+
+@dp.callback_query(F.data.startswith("ginvite:"))
+async def ginvite_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    chat_id = int(callback.data.split(":", 1)[1])
+    # لینک دعوت اختصاصی برای این گروه
+    invite_link = f"https://t.me/{SUPPORT_USERNAME}?start=invite_{chat_id}_{callback.from_user.id}"
+    count = await group_guard.invite_count(chat_id, callback.from_user.id)
+    await callback.message.answer(
+        f"🔗 <b>لینک دعوت اختصاصی گروه</b>\n\n"
+        f"این لینک را در گروه به اشتراک بگذارید؛ هر کسی با آن وارد شود، دعوت شما ثبت می‌شود.\n\n"
+        f"<code>{invite_link}</code>\n\n"
+        f"📈 دعوت‌های ثبت‌شده شما: <b>{count}</b>\n\n"
+        "💡 با هر دعوت موفق، پاداش ویژه دریافت می‌کنید.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 پنل گروه", callback_data=f"gpanel:{chat_id}")],
+        ]),
+    )
+    await callback.answer()
+
+
+@dp.message(Command("start"))
+async def start_with_invite(message: types.Message):
+    """هندلر start با payload دعوت اختصاصی: start=invite_CHATID_INVITERID"""
+    payload = (message.text or "").partition(" ")[2].strip()
+    if payload.startswith("invite_"):
+        try:
+            parts = payload.split("_")
+            chat_id = int(parts[1])
+            inviter_id = int(parts[2])
+            await group_guard.register_invite(chat_id, inviter_id, message.from_user.id)
+            try:
+                await bot.send_message(
+                    inviter_id,
+                    f"🎉 کاربر جدیدی با لینک دعوت شما وارد شد!\n"
+                    f"👤 <code>{message.from_user.id}</code>\n"
+                    f"📈 دعوت‌های شما: <b>{await group_guard.invite_count(chat_id, inviter_id)}</b>",
+                    parse_mode="HTML",
+                )
+            except (TelegramForbiddenError, TelegramBadRequest):
+                pass
+        except (ValueError, IndexError):
+            pass
+    # ادامهٔ استارت عادی
 
 
 @dp.errors()
@@ -20539,6 +20754,14 @@ async def root_landing(request: web.Request):
     if not LANDING_FILE.is_file():
         raise web.HTTPNotFound(text="Landing page is missing")
     return web.FileResponse(LANDING_FILE)
+
+
+async def group_panel_page(request: web.Request):
+    """صفحهٔ پنل مدیریت گروه (دمو) — برای نمایش امکانات قبل از خرید."""
+    panel_file = WEBAPP_DIR / "panel.html"
+    if not panel_file.exists():
+        raise web.HTTPNotFound(text="panel not found")
+    return web.FileResponse(panel_file)
 
 
 async def miniapp_redirect(request):

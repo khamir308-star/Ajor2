@@ -70,12 +70,15 @@ async def get_group_config(chat_id: int) -> dict[str, Any]:
     doc.setdefault("locks", dict(DEFAULT_LOCKS))
     doc.setdefault("antispam", dict(DEFAULT_ANTISPAM))
     doc.setdefault("shutdown", dict(DEFAULT_SHUTDOWN))
+    doc.setdefault("cleanup", dict(DEFAULT_CLEANUP))
     for k, v in DEFAULT_LOCKS.items():
         doc["locks"].setdefault(k, v)
     for k, v in DEFAULT_ANTISPAM.items():
         doc["antispam"].setdefault(k, v)
     for k, v in DEFAULT_SHUTDOWN.items():
         doc["shutdown"].setdefault(k, v)
+    for k, v in DEFAULT_CLEANUP.items():
+        doc["cleanup"].setdefault(k, v)
     return doc
 
 
@@ -199,3 +202,150 @@ async def record_message(chat_id: int, user_id: int) -> None:
         "chat_id": chat_id, "user_id": user_id,
         "created_at": {"$lt": now_utc() - window},
     })
+
+# ================== قابلیت‌های تکمیلی گروه ==================
+
+DEFAULT_CLEANUP = {
+    "enabled": False,
+    "after_minutes": 60,   # پیام‌های قدیمی‌تر از این حذف شوند
+    "types": ["text", "photo", "video"],  # انواع پیام
+}
+
+DEFAULT_RAFFLE = {
+    "enabled": False,
+    "winners": 1,
+    "text": "🎉 قرعه‌کشی گروه! برای شرکت، دکمهٔ زیر را بزنید.",
+}
+
+
+async def cleanup_old_messages(chat_id: int, config: dict[str, Any]) -> None:
+    """پاکسازی خودکار پیام‌های قدیمی (فقط پیام‌های ربات را حذف می‌کند)."""
+    cleanup = config.get("cleanup") or {}
+    if not cleanup.get("enabled"):
+        return
+    after = int(cleanup.get("after_minutes", 60))
+    # پیام‌های ربات در گروه — هر پیام‌ی که بفرستیم را track می‌کنیم
+    # (در bot.py پیام‌های ربات ثبت می‌شوند و اینجا حذف می‌شوند)
+    from datetime import timedelta
+    cutoff = now_utc() - timedelta(minutes=after)
+    # پیاده‌سازی ساده: پیام‌های ثبت‌شده در collection را حذف کن
+    try:
+        from bot import cleanup_messages_col
+        old = await cleanup_messages_col.find({
+            "chat_id": chat_id,
+            "created_at": {"$lt": cutoff},
+        }).to_list(length=200)
+        for msg in old:
+            try:
+                await bot.delete_message(chat_id, msg["message_id"])
+            except Exception:
+                pass
+            await cleanup_messages_col.delete_one({"_id": msg["_id"]})
+    except Exception:
+        pass
+
+
+async def group_stats(chat_id: int, days: int = 7) -> dict[str, Any]:
+    """آمار گروه: تعداد پیام، کاربران فعال، برترین‌ها."""
+    from datetime import timedelta
+    from collections import Counter
+    since = now_utc() - timedelta(days=days)
+    try:
+        from bot import group_stats_col
+        rows = await group_stats_col.find({
+            "chat_id": chat_id,
+            "created_at": {"$gte": since},
+        }).to_list(length=50000)
+    except Exception:
+        rows = []
+    total = len(rows)
+    users = Counter(r.get("user_id") for r in rows)
+    active = len(users)
+    top = users.most_common(10)
+    return {
+        "total_messages": total,
+        "active_users": active,
+        "days": days,
+        "top_users": [{"user_id": uid, "count": cnt} for uid, cnt in top],
+    }
+
+
+async def create_raffle(chat_id: int, winners: int = 1, text: str = "") -> dict:
+    """ساخت قرعه‌کشی گروه."""
+    try:
+        from bot import raffles_col
+    except Exception:
+        from bot import raffles_col
+    raffle = {
+        "_id": f"raffle-{chat_id}-{int(now_utc().timestamp())}",
+        "chat_id": chat_id,
+        "winners": max(1, int(winners)),
+        "text": text or DEFAULT_RAFFLE["text"],
+        "status": "active",  # active → drawn → closed
+        "entries": [],
+        "created_at": now_utc(),
+    }
+    await raffles_col.insert_one(raffle)
+    return raffle
+
+
+async def join_raffle(raffle_id: str, user_id: int) -> bool:
+    """شرکت در قرعه‌کشی (بدون تکرار)."""
+    try:
+        from bot import raffles_col
+    except Exception:
+        return False
+    raffle = await raffles_col.find_one({"_id": raffle_id, "status": "active"})
+    if not raffle:
+        return False
+    if user_id in raffle.get("entries", []):
+        return False
+    await raffles_col.update_one({"_id": raffle_id}, {"$push": {"entries": user_id}})
+    return True
+
+
+async def draw_raffle(raffle_id: str) -> list[int] | None:
+    """انتخاب برندگان قرعه‌کشی."""
+    import random
+    try:
+        from bot import raffles_col
+    except Exception:
+        return None
+    raffle = await raffles_col.find_one({"_id": raffle_id, "status": "active"})
+    if not raffle:
+        return None
+    entries = raffle.get("entries", [])
+    if not entries:
+        return None
+    winners_count = min(int(raffle.get("winners", 1)), len(entries))
+    winners = random.sample(entries, winners_count)
+    await raffles_col.update_one(
+        {"_id": raffle_id},
+        {"$set": {"status": "drawn", "winners": winners, "drawn_at": now_utc()}},
+    )
+    return winners
+
+
+async def register_invite(chat_id: int, inviter_id: int, new_user_id: int) -> None:
+    """ثبت دعوت موفق (برای لینک دعوت اختصاصی)."""
+    try:
+        from bot import invite_stats_col
+    except Exception:
+        return
+    await invite_stats_col.update_one(
+        {"_id": f"inv-{chat_id}-{inviter_id}-{new_user_id}"},
+        {"$set": {
+            "chat_id": chat_id, "inviter_id": inviter_id, "new_user_id": new_user_id,
+            "created_at": now_utc(),
+        }},
+        upsert=True,
+    )
+
+
+async def invite_count(chat_id: int, inviter_id: int) -> int:
+    """تعداد دعوت‌های موفق یک کاربر در گروه."""
+    try:
+        from bot import invite_stats_col
+        return await invite_stats_col.count_documents({"chat_id": chat_id, "inviter_id": inviter_id})
+    except Exception:
+        return 0

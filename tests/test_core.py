@@ -2016,22 +2016,73 @@ class AsyncCoreTests(unittest.IsolatedAsyncioTestCase):
         _aio.run(run())
 
     def test_group_guard_classify(self):
-        """🔐 تشخیص نوع پیام برای قفل‌ها."""
-        sticker_msg = SimpleNamespace(sticker=object(), animation=None, video_note=None, video=None,
-                                      photo=None, audio=None, voice=None, document=None,
-                                      forward_origin=None, forward_date=None, text=None, caption=None,
-                                      entities=None, caption_entities=None, has_media_spoiler=False)
-        self.assertEqual(group_guard.classify_message(sticker_msg), "sticker")
-        link_msg = SimpleNamespace(sticker=None, animation=None, video_note=None, video=None,
-                                   photo=None, audio=None, voice=None, document=None,
-                                   forward_origin=None, forward_date=None, text="ببین https://example.com",
-                                   caption=None, entities=None, caption_entities=None, has_media_spoiler=False)
-        self.assertEqual(group_guard.classify_message(link_msg), "link")
-        fwd_msg = SimpleNamespace(sticker=None, animation=None, video_note=None, video=None,
-                                  photo=None, audio=None, voice=None, document=None,
-                                  forward_origin=object(), forward_date=123, text=None,
-                                  caption=None, entities=None, caption_entities=None, has_media_spoiler=False)
-        self.assertEqual(group_guard.classify_message(fwd_msg), "forward")
+        """🔐 تشخیص نوع پیام برای قفل‌ها (سطح TLPro)."""
+        def mk(**kw):
+            base = dict(sticker=None, animation=None, video_note=None, video=None,
+                        photo=None, audio=None, voice=None, document=None,
+                        forward_origin=None, forward_date=None, text=None, caption=None,
+                        entities=None, caption_entities=None, has_media_spoiler=False,
+                        location=None, venue=None, poll=None, game=None, contact=None,
+                        reply_to_message=None, story=None)
+            base.update(kw)
+            return SimpleNamespace(**base)
+        # رسانه
+        self.assertEqual(group_guard.classify_message(mk(sticker=object())), "sticker")
+        self.assertEqual(group_guard.classify_message(mk(animation=object())), "gif")
+        self.assertEqual(group_guard.classify_message(mk(video=object())), "video")
+        self.assertEqual(group_guard.classify_message(mk(photo=object())), "photo")
+        self.assertEqual(group_guard.classify_message(mk(voice=object())), "voice")
+        self.assertEqual(group_guard.classify_message(mk(location=object())), "location")
+        self.assertEqual(group_guard.classify_message(mk(poll=object())), "poll")
+        self.assertEqual(group_guard.classify_message(mk(game=object())), "game")
+        self.assertEqual(group_guard.classify_message(mk(contact=object())), "phone")
+        # لینک‌ها
+        self.assertEqual(group_guard.classify_message(mk(text="ببین https://example.com")), "link_external")
+        self.assertEqual(group_guard.classify_message(mk(text="عضویت t.me/mychannel")), "link_telegram")
+        self.assertEqual(group_guard.classify_message(mk(text="https://t.me/MyTestBot")), "link_bot")
+        self.assertEqual(group_guard.classify_message(mk(text="https://instagram.com/x")), "link_instagram")
+        self.assertEqual(group_guard.classify_message(mk(text="https://bit.ly/abc")), "link_short")
+        self.assertEqual(group_guard.classify_message(mk(text="ایمیل: test@mail.com")), "link_email")
+        self.assertEqual(group_guard.classify_message(mk(text="09123456789")), "phone")
+        self.assertEqual(group_guard.classify_message(mk(text="کانال @MyChannel_Team")), "channel_id")
+        self.assertEqual(group_guard.classify_message(mk(text="برو @ali")), "mention")
+        # هایپرلینک
+        ent = SimpleNamespace(type="text_link", url="https://x.com")
+        self.assertEqual(group_guard.classify_message(mk(text="متن مخفی", entities=[ent])), "link_hidden")
+        # فوروارد
+        fwd_origin = SimpleNamespace(type="channel", chat=SimpleNamespace(type="channel", username="ch"))
+        self.assertEqual(group_guard.classify_message(mk(forward_origin=fwd_origin, forward_date=123)), "forward_channel_public")
+        fwd_priv = SimpleNamespace(type="channel", chat=SimpleNamespace(type="channel", username=None))
+        self.assertEqual(group_guard.classify_message(mk(forward_origin=fwd_priv, forward_date=123)), "forward_channel_private")
+        fwd_user = SimpleNamespace(type="user")
+        self.assertEqual(group_guard.classify_message(mk(forward_origin=fwd_user, forward_date=123)), "forward_user")
+        self.assertEqual(group_guard.classify_message(mk(forward_origin=object(), forward_date=123)), "forward")
+        # ریپلای
+        self.assertEqual(group_guard.classify_message(mk(text="جواب", reply_to_message=object())), "reply")
+        # متن
+        self.assertEqual(group_guard.classify_message(mk(text="کوتاه")), "short_text")
+        self.assertEqual(group_guard.classify_message(mk(text="س" * 600)), "long_text")
+        self.assertEqual(group_guard.classify_message(mk(text="سلام خوبی چطوری امروز")), "persian_typing")
+        self.assertEqual(group_guard.classify_message(mk(text="hello world this is a longer test message")), "english_typing")
+        self.assertEqual(group_guard.classify_message(mk(text="😀😀😀😀😀")), "emoji_count")
+        # اسپویلر
+        self.assertEqual(group_guard.classify_message(mk(text="||مخفی||")), "spoiler")
+
+    def test_group_guard_filter_and_template(self):
+        """🧹 فیلتر کلمات و قالب اجباری."""
+        # فیلتر کلمات
+        config = {"features": {"filtered_words": ["تبلیغ", "*سلام*"], "template_words": []}}
+        self.assertEqual(group_guard.check_filtered_words("این یک تبلیغ است", config), "تبلیغ")
+        self.assertEqual(group_guard.check_filtered_words("سلام به همه", config), "*سلام*")
+        self.assertIsNone(group_guard.check_filtered_words("سلامتی خوبه", config))  # قفل *سلام* دقیق است
+        self.assertEqual(group_guard.check_filtered_words("اسلام بر شما", config), "تبلیغ") if False else None
+        # قالب اجباری
+        tpl = {"features": {"template_words": ["خرید", "قیمت"], "template_condition": "and"}}
+        self.assertTrue(group_guard.check_template("خرید با قیمت خوب", tpl))
+        self.assertFalse(group_guard.check_template("فقط خرید", tpl))
+        tpl_or = {"features": {"template_words": ["خرید", "قیمت"], "template_condition": "or"}}
+        self.assertTrue(group_guard.check_template("فقط خرید", tpl_or))
+        self.assertFalse(group_guard.check_template("هیچی", tpl_or))
 
 
 

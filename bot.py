@@ -19098,7 +19098,7 @@ async def admin_vip_orders_callback(callback: types.CallbackQuery):
 
 @dp.message(F.chat.type.in_({"group", "supergroup"}))
 async def group_guard_handler(message: types.Message):
-    """محافظ گروه: قفل‌ها، خاموشی و ضد اسپم برای کاربران عادی."""
+    """محافظ گروه: قفل‌ها، خاموشی، ضد اسپم، فیلتر کلمات، قالب اجباری — سطح TLPro."""
     chat_id = message.chat.id
     user_id = message.from_user.id
     try:
@@ -19107,11 +19107,14 @@ async def group_guard_handler(message: types.Message):
         config = None
     if not config:
         return
-    # مدیران و ربات از همه‌چیز معاف‌اند
+    # مدیران از همه‌چیز معاف‌اند (مگر خاموشی برای مدیران فعال باشد)
+    is_admin_member = False
     try:
         member = await bot.get_chat_member(chat_id, user_id)
         if member.status in {"creator", "administrator"}:
-            return
+            is_admin_member = True
+            if not (config.get("shutdown") or {}).get("shutdown_for_admins"):
+                return
     except Exception:
         pass
     is_vip_user = False
@@ -19137,10 +19140,24 @@ async def group_guard_handler(message: types.Message):
         pass
 
     # ۲) ضد اسپم (قبل از قفل‌ها ثبت و بررسی می‌شود)
+    text_for_spam = (message.text or message.caption or "")[:200]
     try:
+        # ضد اسپم سریع (چند پیام در چند ثانیه)
+        fast_spam = await group_guard.check_fast_spam(chat_id, user_id, config)
+        await group_guard.record_message(chat_id, user_id, text_for_spam)
+        if fast_spam and not is_vip_user and not is_admin_member:
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            try:
+                await message.answer("🚫 اسپم سریع ممنوع! کمی صبر کن.", reply_to_message_id=message.message_id)
+            except Exception:
+                pass
+            return
+        # ضد اسپم کلاسیک
         action = await group_guard.check_antispam(chat_id, user_id, config)
-        await group_guard.record_message(chat_id, user_id)
-        if action and not is_vip_user:
+        if action and not is_vip_user and not is_admin_member:
             try:
                 await message.delete()
             except Exception:
@@ -19148,24 +19165,156 @@ async def group_guard_handler(message: types.Message):
             if action in {"mute", "ban"}:
                 try:
                     if action == "mute":
-                        await bot.restrict_chat_member(chat_id, user_id, permissions=types.ChatPermissions(can_send_messages=False), until_date=int(group_guard.now_utc().timestamp()) + 3600)
+                        minutes = int((config.get("antispam") or {}).get("mute_duration", 60))
+                        await bot.restrict_chat_member(chat_id, user_id, permissions=types.ChatPermissions(can_send_messages=False), until_date=int(group_guard.now_utc().timestamp()) + minutes * 60)
                     else:
-                        await bot.ban_chat_member(chat_id, user_id)
+                        days = int((config.get("antispam") or {}).get("ban_duration", 180))
+                        await bot.ban_chat_member(chat_id, user_id, until_date=int(group_guard.now_utc().timestamp()) + days * 86400)
                 except Exception:
                     pass
             elif action == "warn":
                 try:
+                    await group_guard.add_warning(chat_id, user_id, "اسپم")
                     await message.answer("⚠️ پیام شما به دلیل اسپم حذف شد.", reply_to_message_id=message.message_id)
                 except Exception:
                     pass
             return
+        # پیام تکراری
+        if await group_guard.check_duplicate(chat_id, user_id, text_for_spam, config) and not is_vip_user and not is_admin_member:
+            dup_action = (config.get("antispam") or {}).get("duplicate_action", "none")
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            if dup_action == "mute":
+                try:
+                    await bot.restrict_chat_member(chat_id, user_id, permissions=types.ChatPermissions(can_send_messages=False), until_date=int(group_guard.now_utc().timestamp()) + 3600)
+                except Exception:
+                    pass
+            elif dup_action == "warn":
+                try:
+                    await group_guard.add_warning(chat_id, user_id, "پیام تکراری")
+                except Exception:
+                    pass
+            try:
+                await message.answer("🔁 پیام تکراری مجاز نیست!", reply_to_message_id=message.message_id)
+            except Exception:
+                pass
+            return
     except Exception:
         pass
 
-    # ۳) قفل‌ها
+    # ۲.۵) ضد تبچی
+    try:
+        anti_tabchi = (config.get("antispam") or {}).get("anti_tabchi", "off")
+        if anti_tabchi != "off" and not is_vip_user and not is_admin_member:
+            if await group_guard.is_tabchi(user_id):
+                try:
+                    await message.delete()
+                except Exception:
+                    pass
+                try:
+                    await bot.ban_chat_member(chat_id, user_id)
+                except Exception:
+                    pass
+                return
+    except Exception:
+        pass
+
+    # ۳) فیلتر کلمات
+    try:
+        features = config.get("features") or {}
+        filtered = group_guard.check_filtered_words(text_for_spam, config)
+        if filtered and not is_vip_user and not is_admin_member:
+            filter_action = features.get("filter_action", "delete")
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            if filter_action == "warn":
+                try:
+                    await group_guard.add_warning(chat_id, user_id, f"کلمه فیلترشده: {filtered}")
+                except Exception:
+                    pass
+            elif filter_action == "mute":
+                try:
+                    await bot.restrict_chat_member(chat_id, user_id, permissions=types.ChatPermissions(can_send_messages=False), until_date=int(group_guard.now_utc().timestamp()) + 3600)
+                except Exception:
+                    pass
+            elif filter_action == "kick":
+                try:
+                    await bot.ban_chat_member(chat_id, user_id)
+                except Exception:
+                    pass
+            try:
+                await message.answer("🚫 این پیام به دلیل کلمهٔ نامناسب حذف شد.", reply_to_message_id=message.message_id)
+            except Exception:
+                pass
+            return
+        # قالب اجباری
+        if (features.get("template_words")) and not is_vip_user and not is_admin_member and text_for_spam:
+            if not group_guard.check_template(text_for_spam, config):
+                template_action = features.get("template_action", "warn")
+                try:
+                    await message.delete()
+                except Exception:
+                    pass
+                if template_action == "warn":
+                    try:
+                        await group_guard.add_warning(chat_id, user_id, "عدم رعایت قالب")
+                    except Exception:
+                        pass
+                elif template_action == "mute":
+                    try:
+                        await bot.restrict_chat_member(chat_id, user_id, permissions=types.ChatPermissions(can_send_messages=False), until_date=int(group_guard.now_utc().timestamp()) + 3600)
+                    except Exception:
+                        pass
+                elif template_action == "kick":
+                    try:
+                        await bot.ban_chat_member(chat_id, user_id)
+                    except Exception:
+                        pass
+                try:
+                    await message.answer("📌 پیام شما قالب اجباری گروه را رعایت نکرده.", reply_to_message_id=message.message_id)
+                except Exception:
+                    pass
+                return
+    except Exception:
+        pass
+
+    # ۴) قفل‌ها (با جزئیات)
     msg_type = group_guard.classify_message(message)
-    if msg_type and not is_vip_user:
-        locked = (config.get("locks") or {}).get(msg_type, False)
+    if msg_type and not is_vip_user and not is_admin_member:
+        locks = config.get("locks") or {}
+        lock_value = locks.get(msg_type, False)
+        locked = False
+        if isinstance(lock_value, dict):
+            locked = lock_value.get("locked", False)
+            # بررسی حالت‌های خاص
+            if msg_type == "video" and locked and message.video:
+                mode = lock_value.get("mode", "free")
+                size_mb = (message.video.file_size or 0) / (1024 * 1024)
+                thresholds = {"10mb": 10, "50mb": 50, "100mb": 100, "200mb": 200, "500mb": 500, "all": 0}
+                limit = thresholds.get(mode, 0)
+                if mode != "all" and limit and size_mb <= limit:
+                    locked = False  # زیر سقف مجاز است
+            elif msg_type == "emoji_count" and locked:
+                max_em = int(lock_value.get("max", 3))
+                if group_guard._emoji_count(text_for_spam) <= max_em:
+                    locked = False
+            elif msg_type == "custom_emoji_count" and locked:
+                max_em = int(lock_value.get("max", 3))
+                if group_guard._emoji_count(text_for_spam) <= max_em:
+                    locked = False
+            elif msg_type == "phone" and locked:
+                mode = lock_value.get("mode", "normal")
+                if mode != "sensitive":
+                    locked = False  # حالت عادی فقط نمایش را محدود نمی‌کند
+            elif msg_type in {"edit_text", "edit_caption"} and locked:
+                # در هندلر ویرایش بررسی می‌شود؛ اینجا فقط وجود قفل اعلام می‌شود
+                pass
+        else:
+            locked = bool(lock_value)
         if locked:
             try:
                 await message.delete()
@@ -19183,17 +19332,60 @@ async def group_guard_handler(message: types.Message):
 
 # ================== پنل مدیریت گروه (ادمین) ==================
 
+# کش دسته‌بندی فعال قفل‌ها در پنل ادمین
+_group_lock_cat_cache: dict[int, str] = {}
+
+
 def group_locks_keyboard(chat_id: int, config: dict) -> InlineKeyboardMarkup:
     rows = []
     locks = config.get("locks") or {}
-    for key, label in group_guard.LOCKS.items():
-        state = "🔓" if not locks.get(key) else "🔒"
+    active_cat = _group_lock_cat_cache.get(chat_id, "🔤 متن")
+    cats = list(group_guard.LOCK_CATEGORIES.keys())
+    # نوار دسته‌بندی
+    cat_row = []
+    for cat in cats:
+        label = cat.split(" ", 1)[-1]
+        cat_row.append(InlineKeyboardButton(
+            text=f"{'▫️' if cat != active_cat else '▪️'} {label[:8]}",
+            callback_data=f"glockcat:{chat_id}:{cat}",
+        ))
+        if len(cat_row) == 3:
+            rows.append(cat_row)
+            cat_row = []
+    if cat_row:
+        rows.append(cat_row)
+    # قفل‌های دستهٔ فعال
+    for key in group_guard.LOCK_CATEGORIES.get(active_cat, []):
+        label = group_guard.LOCKS.get(key, key)
+        lock_value = locks.get(key, False)
+        state = "🔓"
+        if isinstance(lock_value, dict):
+            state = "🔒" if lock_value.get("locked") else "🔓"
+        else:
+            state = "🔒" if lock_value else "🔓"
         rows.append([InlineKeyboardButton(
             text=f"{state} {label}",
             callback_data=f"gplock:{chat_id}:{key}",
         )])
     rows.append([InlineKeyboardButton(text="🔙 پنل مدیریت گروه", callback_data=f"gpanel:{chat_id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+@dp.callback_query(F.data.startswith("glockcat:"))
+async def glockcat_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    _, chat_id_s, cat = callback.data.split(":", 2)
+    chat_id = int(chat_id_s)
+    _group_lock_cat_cache[chat_id] = cat
+    config = await group_guard.get_group_config(chat_id)
+    await callback.message.edit_text(
+        "🔐 <b>قفل‌های گروه</b>\n\n"
+        "هر قفل که فعال باشد، کاربر عادی نمی‌تواند آن نوع پیام را بفرستد. کاربران ویژه آزادند.",
+        parse_mode="HTML",
+        reply_markup=group_locks_keyboard(chat_id, config),
+    )
+    await callback.answer()
 
 
 def group_panel_kb(chat_id: int) -> InlineKeyboardMarkup:

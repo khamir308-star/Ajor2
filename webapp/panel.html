@@ -5,132 +5,374 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <title>پنل مدیریت گروه — آجُرپاره</title>
 <style>
-:root {
-  --bg: #0b0a0f; --card: #15141d; --card2: #1c1a26; --text: #eee;
-  --muted: #9a97a8; --accent: #7c5cff; --green: #3ddc84; --red: #ff5c7a;
-  --yellow: #ffc857; --border: rgba(255,255,255,.08);
-}
-* { margin:0; padding:0; box-sizing:border-box; }
-body { background:var(--bg); color:var(--text); font-family:'Segoe UI',Tahoma,sans-serif; padding:16px; padding-bottom:90px; }
-.header { display:flex; align-items:center; gap:12px; margin-bottom:18px; }
-.logo { width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg,#7c5cff,#5a3dff); display:flex; align-items:center; justify-content:center; font-size:24px; }
-.header h1 { font-size:18px; }
-.header p { font-size:12px; color:var(--muted); }
-.badge { display:inline-block; background:rgba(124,92,255,.2); color:var(--accent); border:1px solid rgba(124,92,255,.4); padding:3px 10px; border-radius:20px; font-size:11px; }
-.badge.days { background:rgba(61,220,132,.15); color:var(--green); border-color:rgba(61,220,132,.3); }
-.trial-banner { background:linear-gradient(135deg,rgba(124,92,255,.15),rgba(61,220,132,.1)); border:1px solid rgba(124,92,255,.3); border-radius:14px; padding:14px; margin-bottom:16px; font-size:13px; }
-.trial-banner b { color:var(--green); }
-.card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; margin-bottom:14px; }
-.card h2 { font-size:15px; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
-.section-title { font-size:12px; color:var(--muted); margin:18px 0 8px; font-weight:600; }
-.row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); }
-.row:last-child { border-bottom:none; }
-.row .label { font-size:13px; }
-.row .desc { font-size:11px; color:var(--muted); margin-top:2px; }
-.lock { width:44px; height:24px; border-radius:20px; background:var(--card2); border:1px solid var(--border); position:relative; transition:.2s; cursor:pointer; }
-.lock.active { background:var(--green); }
-.lock::after { content:""; position:absolute; width:18px; height:18px; border-radius:50%; background:#fff; top:2px; right:2px; transition:.2s; }
-.lock.active::after { right:22px; }
-.btn { display:block; width:100%; padding:13px; border:none; border-radius:12px; background:var(--accent); color:#fff; font-size:14px; font-weight:600; cursor:pointer; margin-top:6px; font-family:inherit; }
-.btn.secondary { background:var(--card2); color:var(--text); border:1px solid var(--border); }
-.btn.green { background:var(--green); color:#000; }
-.stats-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
-.stat { background:var(--card2); border-radius:12px; padding:12px; text-align:center; }
-.stat b { font-size:18px; display:block; }
-.stat span { font-size:11px; color:var(--muted); }
-.vip-note { background:rgba(61,220,132,.08); border:1px solid rgba(61,220,132,.2); border-radius:12px; padding:12px; font-size:12px; color:var(--green); margin-top:10px; }
-.plans { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.plan { background:var(--card2); border:1px solid var(--border); border-radius:14px; padding:14px; text-align:center; cursor:pointer; transition:.2s; }
-.plan:hover { border-color:var(--accent); transform:translateY(-2px); }
-.plan.best { border-color:var(--accent); background:rgba(124,92,255,.1); }
-.plan .price { font-size:17px; font-weight:700; color:var(--accent); margin:6px 0; }
-.plan .per { font-size:11px; color:var(--muted); }
-.demo-note { font-size:11px; color:var(--muted); text-align:center; margin-top:14px; }
+:root{--bg:#0b0a0f;--card:#15141d;--card2:#1c1a26;--text:#eee;--muted:#9a97a8;--accent:#7c5cff;--green:#3ddc84;--red:#ff5c7a;--yellow:#ffc857;--border:rgba(255,255,255,.08)}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,sans-serif;padding:16px;padding-bottom:110px}
+.header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+.logo{width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,#7c5cff,#5a3dff);display:flex;align-items:center;justify-content:center;font-size:24px}
+.header h1{font-size:18px}
+.header p{font-size:12px;color:var(--muted)}
+.badge{display:inline-block;background:rgba(124,92,255,.2);color:var(--accent);border:1px solid rgba(124,92,255,.4);padding:3px 10px;border-radius:20px;font-size:11px}
+.badge.days{background:rgba(61,220,132,.15);color:var(--green);border-color:rgba(61,220,132,.3)}
+.trial-banner{background:linear-gradient(135deg,rgba(124,92,255,.15),rgba(61,220,132,.1));border:1px solid rgba(124,92,255,.3);border-radius:14px;padding:14px;margin-bottom:16px;font-size:13px}
+.trial-banner b{color:var(--green)}
+.quick-nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.qbtn{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:9px 13px;font-size:12.5px;cursor:pointer;font-family:inherit;transition:.2s;text-decoration:none;color:var(--text)}
+.qbtn:hover{border-color:var(--accent)}
+.qbtn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px}
+.card h2{font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-title{font-size:12px;color:var(--muted);margin:18px 0 8px;font-weight:600}
+.row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);gap:10px}
+.row:last-child{border-bottom:none}
+.row .label{font-size:13px;flex:1}
+.row .desc{font-size:11px;color:var(--muted);margin-top:2px}
+.lock{width:44px;height:24px;border-radius:20px;background:var(--card2);border:1px solid var(--border);position:relative;transition:.2s;cursor:pointer;flex-shrink:0}
+.lock.active{background:var(--green)}
+.lock::after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;background:#fff;top:2px;right:2px;transition:.2s}
+.lock.active::after{right:22px}
+select,input[type=text],input[type=number],textarea{background:var(--card2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:9px 12px;font-size:13px;font-family:inherit;max-width:170px}
+select{max-width:160px}
+textarea{width:100%;max-width:100%;min-height:70px;margin-top:6px}
+.btn{display:block;width:100%;padding:13px;border:none;border-radius:12px;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;margin-top:6px;font-family:inherit}
+.btn.secondary{background:var(--card2);color:var(--text);border:1px solid var(--border)}
+.btn.green{background:var(--green);color:#000}
+.btn.sm{padding:8px 14px;font-size:12px;width:auto;display:inline-block;margin:2px}
+.btn.red{background:var(--red);color:#fff}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.stat{background:var(--card2);border-radius:12px;padding:12px;text-align:center}
+.stat b{font-size:18px;display:block}
+.stat span{font-size:11px;color:var(--muted)}
+.vip-note{background:rgba(61,220,132,.08);border:1px solid rgba(61,220,132,.2);border-radius:12px;padding:12px;font-size:12px;color:var(--green);margin-top:10px}
+.plans{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.plan{background:var(--card2);border:1px solid var(--border);border-radius:14px;padding:14px;text-align:center;cursor:pointer;transition:.2s}
+.plan:hover{border-color:var(--accent);transform:translateY(-2px)}
+.plan.best{border-color:var(--accent);background:rgba(124,92,255,.1)}
+.plan .price{font-size:17px;font-weight:700;color:var(--accent);margin:6px 0}
+.plan .per{font-size:11px;color:var(--muted)}
+.demo-note{font-size:11px;color:var(--muted);text-align:center;margin-top:14px}
+.category-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.cat-tab{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:6px 12px;font-size:11.5px;cursor:pointer;font-family:inherit;color:var(--muted)}
+.cat-tab.active{background:rgba(124,92,255,.15);border-color:var(--accent);color:var(--accent)}
+.tag{font-size:10px;background:rgba(124,92,255,.15);color:var(--accent);border-radius:6px;padding:2px 7px;margin-right:6px}
+.tag.vip{background:rgba(255,200,87,.15);color:var(--yellow)}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--green);color:#000;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:600;opacity:0;transition:.3s;pointer-events:none;z-index:99}
+.toast.show{opacity:1}
+.mini-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+code{background:var(--card2);padding:2px 7px;border-radius:6px;font-size:11.5px;color:var(--accent);direction:ltr;display:inline-block}
+.footer-cta{position:fixed;bottom:0;left:0;right:0;background:rgba(11,10,15,.96);backdrop-filter:blur(10px);padding:14px 16px;display:flex;gap:10px;z-index:50;border-top:1px solid var(--border)}
+.footer-cta .btn{margin:0}
 </style>
 </head>
 <body>
-  <div class="header">
-    <div class="logo">🧱</div>
-    <div>
-      <h1>آجُرپاره | پنل مدیریت گروه</h1>
-      <p>مدیریت حرفه‌ای گروه‌ها و سوپرگروه‌ها</p>
-    </div>
+<div class="header">
+  <div class="logo">🧱</div>
+  <div>
+    <h1>آجُرپاره | پنل مدیریت گروه</h1>
+    <p>مدیریت حرفه‌ای گروه‌ها — هم‌تراز پنل‌های پیشرفته</p>
   </div>
+</div>
 
-  <div class="trial-banner">
-    🔍 این یک <b>پنل آزمایشی (دمو)</b> است — برای مشاهدهٔ امکانات قبل از خرید اشتراک.
-    با خرید اشتراک پرمیوم، همهٔ این قابلیت‌ها برای گروه شما <b>فعال</b> می‌شود.
+<div class="trial-banner">
+  🔍 این یک <b>پنل آزمایشی (دمو)</b> است — برای مشاهدهٔ امکانات قبل از خرید اشتراک.
+  با خرید اشتراک پرمیوم، همهٔ این قابلیت‌ها برای گروه شما <b>فعال</b> می‌شود.
+  <div class="badge days" id="vipStatus" style="margin-top:8px">👑 وضعیت: نمایشی — برای فعال‌سازی اشتراک بخرید</div>
+</div>
+
+<div class="quick-nav" id="quickNav">
+  <a class="qbtn" href="#locks">🔐 قفل‌ها</a>
+  <a class="qbtn" href="#vip">💎 ویژگی‌ها</a>
+  <a class="qbtn" href="#spam">⛔️ ضد مزاحمت</a>
+  <a class="qbtn" href="#set">⚙️ تنظیمات</a>
+  <a class="qbtn" href="#pay">🏦 بانک پرداخت</a>
+  <a class="qbtn" href="#text">✏️ متن‌ها</a>
+  <a class="qbtn" href="#admins">👮‍♂️ مدیران</a>
+</div>
+
+<!-- ============ خاموشی‌ها ============ -->
+<div class="card" id="shutdown">
+  <h2>💤 خاموشی‌ها</h2>
+  <div class="row"><div class="label">ساعت خاموش خودکار <span class="tag">؟</span><div class="desc">در این بازه، ارسال پیام بسته می‌شود</div></div>
+    <div class="mini-row"><input type="time" id="offTime" value="23:00"><input type="time" id="onTime" value="06:00"></div></div>
+  <div class="row"><div class="label">پیام خاموشی <div class="desc"><code>#date#</code> = زمان فعلی</div></div><input type="text" id="offMsg" value="🔇 گروه موقتاً خاموش است."></div>
+  <div class="row"><div class="label">پیام روشن شدن</div><input type="text" id="onMsg" value="🔊 گروه روشن شد."></div>
+  <div class="row"><div class="label">خاموشی مدت‌دار</div>
+    <select id="durSel"><option>انتخاب مدت</option><option>15 دقیقه</option><option>30 دقیقه</option><option>1 ساعت</option><option>2 ساعت</option><option>3 ساعت</option><option>6 ساعت</option><option>12 ساعت</option><option>24 ساعت</option><option>2 روز</option><option>3 روز</option><option>7 روز</option><option>30 روز</option></select></div>
+  <div class="row"><div class="label">🗑 حذف خودکار پیام خاموشی</div><div class="lock" data-demo="shutdownDelete"></div></div>
+  <div class="row"><div class="label">🫢 خاموشی حتی برای مدیران</div><div class="lock" data-demo="shutdownAdmins"></div></div>
+</div>
+
+<!-- ============ قفل‌ها ============ -->
+<div class="card" id="locks">
+  <h2>🔐 قفل‌ها</h2>
+  <div class="desc" style="font-size:12px;color:var(--muted);margin-bottom:12px">هر قفل که فعال باشد، کاربر عادی نمی‌تواند آن نوع پیام را بفرستد. کاربران ویژه آزادند.</div>
+  <div class="category-tabs" id="catTabs"></div>
+  <div id="locksList"></div>
+</div>
+
+<!-- ============ ویژگی‌ها ============ -->
+<div class="card" id="vip">
+  <h2>💎 ویژگی‌ها</h2>
+  <div class="section-title">🗑 پاکسازی خودکار پیام قدیمی</div>
+  <div class="row"><div class="label">فعال‌سازی</div><div class="lock" data-demo="autoCleanup"></div></div>
+  <div class="row"><div class="label">بازهٔ پاکسازی</div><select id="cleanupSel"><option>15 دقیقه (ویژه)</option><option>30 دقیقه (ویژه)</option><option>1 ساعت</option><option>3 ساعت</option><option>5 ساعت</option><option>10 ساعت</option><option>16 ساعت</option><option>24 ساعت</option><option>48 ساعت (ویژه)</option></select></div>
+  <div class="row"><div class="label">انواع پیام</div><div class="mini-row"><span class="tag">متن</span><span class="tag">عکس</span><span class="tag">ویدئو</span><span class="tag">ویس</span><span class="tag">فایل</span><span class="tag">استیکر</span></div></div>
+
+  <div class="section-title">🗂 قفل فایل اعضاء جدید</div>
+  <div class="row"><div class="label">مدت محدودیت فایل برای عضو جدید</div><select id="newFileSel"><option>غیرفعال</option><option>1 روز</option><option>2 روز</option><option>3 روز</option><option>5 روز</option><option>10 روز</option><option>15 روز</option><option>30 روز</option></select></div>
+
+  <div class="section-title">💭 پاسخگوی خودکار</div>
+  <div class="row"><div class="label">حالت پاسخ‌گویی</div><select id="autoReplySel"><option>خاموش</option><option>مشابه</option><option>دقیق</option></select></div>
+
+  <div class="section-title">📢 عضو اجباری</div>
+  <div class="row"><div class="label">عضو اجباری کانال</div><div class="mini-row"><input type="text" id="forceCh" placeholder="@channel1"><input type="text" id="forceCh2" placeholder="@channel2 (ویژه)"></div></div>
+  <div class="row"><div class="label">عضو اجباری گروه</div><input type="text" id="forceGr" placeholder="آیدی گروه"></div>
+  <div class="row"><div class="label">💎 کاربر ویژه بی اجبار</div><div class="lock" data-demo="vipNoForce"></div></div>
+
+  <div class="section-title">🤬 کلمات فیلتر شده</div>
+  <div class="row"><div class="label">واکنش به فیلتر</div><select id="filterAction"><option>حذف پست</option><option>ثبت اخطار</option><option>سکوت</option><option>اخراج</option></select></div>
+  <textarea id="filterWords" placeholder="کلمات را با کاما جدا کنید... (مثال: تبلیغ، اسپم، 🔞)"></textarea>
+  <div class="desc" style="font-size:10.5px;color:var(--muted);margin-top:4px">💡 با <code>*کلمه*</code> دقیقاً همان کلمه فیلتر می‌شود (مثل <code>*سلام*</code>)</div>
+
+  <div class="section-title">📌 قالب اجباری پیام</div>
+  <div class="row"><div class="label">شرط قالب</div><select id="templateCond"><option>و — همه کلمات</option><option>یا — حداقل یکی</option></select></div>
+  <textarea id="templateWords" placeholder="کلمات قالب را با کاما جدا کنید..."></textarea>
+
+  <div class="section-title">🎉 قرعه‌کشی</div>
+  <div class="row"><div class="label">تعداد برنده</div><input type="number" id="raffleWinners" value="1" min="1" max="20"></div>
+  <div class="row"><div class="label">مخاطب قرعه‌کشی</div><select id="raffleAud"><option>همه اعضا</option><option>فقط کاربران ویژه</option><option>کاربران قدیمی (۷+ روز)</option><option>کاربران جدید</option><option>فقط دعوت‌کننده‌ها</option></select></div>
+  <textarea id="raffleText" placeholder="متن قرعه‌کشی...">🎉 قرعه‌کشی گروه! برای شرکت، دکمهٔ زیر را بزنید.</textarea>
+  <div class="mini-row"><button class="btn sm green">✅ ایجاد قرعه‌کشی</button><button class="btn sm secondary">👀 لیست شرکت‌کنندگان</button></div>
+
+  <div class="section-title">🤠 اسپانسر گروه</div>
+  <div class="row"><div class="label">لینک اسپانسر</div><input type="text" id="sponsorLink" placeholder="https://t.me/..."></div>
+  <div class="row"><div class="label">متن اسپانسر</div><input type="text" id="sponsorText" placeholder="متن نمایشی اسپانسر..."></div>
+
+  <div class="section-title">☎️ دریافت شماره‌ها</div>
+  <div class="mini-row"><button class="btn sm secondary">خروجی TXT (متنی)</button><button class="btn sm secondary">خروجی XLS (اکسل)</button></div>
+
+  <div class="section-title">🔗 لینک دعوت اختصاصی</div>
+  <div class="row"><div class="label">لینک دعوت شما</div><code>https://t.me/Ajorparehbot?start=invite_CHAT_YOU</code></div>
+</div>
+
+<!-- ============ ضد مزاحمت ============ -->
+<div class="card" id="spam">
+  <h2>⛔️ ضد مزاحمت</h2>
+  <div class="row"><div class="label">👤 کاربر عادی — تعداد پیام</div><div class="mini-row"><input type="number" id="spamCount" value="5" min="1" max="100" style="width:70px"> <span style="font-size:12px;color:var(--muted)">در</span> <select id="spamWindow"><option>1 دقیقه</option><option>2 دقیقه</option><option>3 دقیقه</option><option>5 دقیقه</option><option>10 دقیقه</option><option>15 دقیقه</option><option>30 دقیقه</option><option>1 ساعت</option></select></div></div>
+  <div class="row"><div class="label">💁‍♂️ کاربر ویژه — تعداد پیام</div><div class="mini-row"><input type="number" id="vipSpamCount" value="20" min="1" max="200" style="width:70px"> <span style="font-size:12px;color:var(--muted)">در</span> <select id="vipSpamWindow"><option>1 دقیقه</option><option>2 دقیقه</option><option>3 دقیقه</option><option>5 دقیقه</option><option>10 دقیقه</option><option>15 دقیقه</option></select></div></div>
+  <div class="row"><div class="label">⚖️ واکنش به پیام بیشتر</div><select id="spamAction"><option>اخراج</option><option>سکوت</option><option>اخطار و حذف</option><option>فقط حذف</option></select></div>
+  <div class="row"><div class="label">🚫 ضد اسپم سریع</div><div class="mini-row"><input type="number" id="fastCount" value="8" min="2" max="30" style="width:60px"> <span style="font-size:12px;color:var(--muted)">پیام در</span> <select id="fastSec"><option>3 ثانیه</option><option>5 ثانیه</option><option>8 ثانیه</option><option>10 ثانیه</option></select></div></div>
+  <div class="row"><div class="label">👾 ضد تبچی</div><select id="tabchiSel"><option>فعال — خیلی حساس</option><option>فعال</option><option>غیرفعال</option></select></div>
+  <div class="row"><div class="label">🤖 ورود ربات‌ها</div><select id="botJoin"><option>اخراج ربات</option><option>اخراج ربات و اضافه‌کننده</option><option>مجاز</option></select></div>
+  <div class="row"><div class="label">⛔️ اخراج کاربر جدید</div><div class="lock" data-demo="kickNew"></div></div>
+  <div class="row"><div class="label">🔍 واکنش به پیام تکراری</div><select id="dupSel"><option>هیچی!</option><option>سکوت</option><option>حذف پیام</option><option>ثبت اخطار</option></select></div>
+  <div class="row"><div class="label">🥷 ضد خیانت <div class="desc">تعداد اخراج/تحریم</div></div><input type="number" id="betrayCount" value="0" min="0" max="50"></div>
+  <div class="row"><div class="label">⚠️ حداکثر اخطار</div><div class="mini-row"><input type="number" id="maxWarn" value="3" min="1" max="20" style="width:60px"><select id="warnAction"><option>اخراج کن</option><option>ساکت کن</option></select></div></div>
+  <div class="row"><div class="label">🗑 ریست خودکار اخطار</div><select id="warnReset"><option>هر روز</option><option>هر سه روز</option><option>هر هفته</option><option>هر دو هفته</option><option>ماهیانه</option><option>هیچ وقت</option></select></div>
+  <div class="row"><div class="label">💀 مدت اخراج خودکار</div><select id="banDur"><option>1 روز</option><option>2 روز</option><option>3 روز</option><option>5 روز</option><option>10 روز</option><option>20 روز</option><option>30 روز</option><option>60 روز</option><option>90 روز</option><option>180 روز</option><option>دائمی</option></select></div>
+  <div class="row"><div class="label">🤫 مدت تحریم خودکار</div><select id="muteDur"><option>5 دقیقه</option><option>10 دقیقه</option><option>30 دقیقه</option><option>60 دقیقه</option><option>5 ساعت</option><option>12 ساعت</option><option>1 روز</option><option>3 روز</option><option>1 هفته</option></select></div>
+  <div class="row"><div class="label">⚠️ گزارشگر هوشمند <div class="desc">پس از N گزارش، خودکار واکنش</div></div><select id="smartRep"><option>خاموش</option><option>روشن</option></select></div>
+  <div class="row"><div class="label">🗑 حذف دیلیت اکانتی‌ها</div><div class="lock" data-demo="delAccount"></div></div>
+</div>
+
+<!-- ============ تنظیمات ============ -->
+<div class="card" id="set">
+  <h2>⚙️ تنظیمات</h2>
+  <div class="row"><div class="label">🔌 وضعیت ربات</div><div class="lock active" data-demo="botStatus"></div></div>
+  <div class="row"><div class="label">🌍 زبان ربات</div><select id="langSel"><option>فارسی | Persian</option><option>انگلیسی | English</option><option>ترکی | Turkish</option><option>روسی | Russian</option><option>عربی | Arabic</option></select></div>
+  <div class="row"><div class="label">↪️ بررسی فوروارد</div><div class="lock" data-demo="checkFwd"></div></div>
+  <div class="row"><div class="label">🗑 بازیابی پیام</div><div class="lock" data-demo="restoreMsg"></div></div>
+  <div class="row"><div class="label">🔕 حذف پیام سرویس</div><select id="svcMsg"><option>غیرفعال</option><option>فوری</option><option>3 دقیقه بعد</option><option>5 دقیقه بعد</option><option>10 دقیقه بعد</option><option>30 دقیقه بعد</option></select></div>
+  <div class="row"><div class="label">🔊 تایمر اطلاع‌رسان</div><select id="timerMsg"><option>ثابت بماند</option><option>حذف بعد از 1 دقیقه</option><option>حذف بعد از 2 دقیقه</option><option>حذف بعد از 5 دقیقه</option></select></div>
+  <div class="row"><div class="label">📊 گزارش فعالیت‌ها</div><div class="lock" data-demo="activityLog"></div></div>
+  <div class="row"><div class="label">🗑 پاکسازی خودکار کل پیام‌ها</div><div class="mini-row"><select id="cleanDay"><option>شنبه</option><option>یک‌شنبه</option><option>دوشنبه</option><option>سه‌شنبه</option><option>چهارشنبه</option><option>پنجشنبه</option><option>جمعه</option></select><select id="cleanHour"><option>غیرفعال</option><option>ساعت 02AM</option><option>ساعت 04AM</option><option>ساعت 06AM</option><option>ساعت 12PM</option><option>ساعت 23PM</option></select></div></div>
+  <div class="row"><div class="label">📌 حذف سنجاق خودکار</div><div class="lock" data-demo="unpinAuto"></div></div>
+  <div class="row"><div class="label">❔ گزارش دلیل حذف پست</div><div class="lock" data-demo="deleteReason"></div></div>
+  <div class="row"><div class="label">🔑 توکن OpenAI (هوش مصنوعی)</div><input type="text" placeholder="sk-..."></div>
+</div>
+
+<!-- ============ بانک پرداخت ============ -->
+<div class="card" id="pay">
+  <h2>🏦 بانک پرداخت</h2>
+  <div class="row"><div class="label">📌 روش اجبار</div><select id="payMethod"><option>فقط پرداخت</option><option>پرداخت و اجبار</option></select></div>
+  <div class="row"><div class="label">🟡 خرید با ارز TON</div><select id="tonSel"><option>غیرفعال</option><option>ضریب 1</option><option>ضریب 2</option><option>ضریب 3</option><option>ضریب 5</option></select></div>
+  <div class="row"><div class="label">💳 شبا بانکی</div><input type="text" id="shaba" placeholder="IR..."></div>
+  <div class="row"><div class="label">💰 موجودی ریالی</div><div style="font-size:13px;color:var(--yellow)">کیف پول خالی!</div></div>
+  <div class="row"><div class="label">💰 موجودی ارزی</div><div style="font-size:13px;color:var(--yellow)">کیف پول خالی!</div></div>
+  <div class="row"><div class="label">🗂 سوابق تسویه</div><button class="btn sm secondary">مشاهده</button></div>
+  <div class="section-title">🔖 لیست پلان‌ها</div>
+  <div class="plans" id="planList">
+    <div class="plan"><div>✏️ ارسال پیام</div><div class="price">50 پیام</div><div class="per">10,000 تومان</div><button class="btn sm secondary" style="margin-top:8px">ساخت</button></div>
+    <div class="plan best"><div>💎 کاربر ویژه</div><div class="price">30 روز</div><div class="per">40,000 تومان</div><button class="btn sm secondary" style="margin-top:8px">ساخت</button></div>
+    <div class="plan"><div>🔄 تکرار پیام</div><div class="price">30 روز</div><div class="per">10,000 تومان</div><button class="btn sm secondary" style="margin-top:8px">ساخت</button></div>
+    <div class="plan"><div>📌 سنجاق پیام</div><div class="price">30 روز</div><div class="per">10,000 تومان</div><button class="btn sm secondary" style="margin-top:8px">ساخت</button></div>
+    <div class="plan"><div>👥 حضور در گروه</div><div class="price">—</div><div class="per">سفارشی</div><button class="btn sm secondary" style="margin-top:8px">ساخت</button></div>
   </div>
+</div>
 
-  <div class="badge days" id="vipStatus">👑 وضعیت: نمایشی — برای فعال‌سازی اشتراک بخرید</div>
+<!-- ============ متن‌ها ============ -->
+<div class="card" id="text">
+  <h2>✏️ متن‌ها</h2>
+  <div class="section-title">👋 پیام خوش‌آمدگویی</div>
+  <textarea id="welcomeText">👋 به {group} خوش اومدی {user}!
+📅 {date}
+📜 قوانین: {rules}</textarea>
+  <div class="desc" style="font-size:10.5px;color:var(--muted);margin:4px 0 10px"><code>{user}</code> نام کاربر · <code>{group}</code> نام گروه · <code>{rules}</code> قوانین · <code>{date}</code> تاریخ · <code>{channel}</code> کانال اجباری</div>
 
-  <div class="section-title">📊 آمار و وضعیت کلی گروه</div>
-  <div class="card">
-    <div class="stats-grid">
-      <div class="stat"><b id="statMsg">۱۲۴</b><span>پیام امروز</span></div>
-      <div class="stat"><b id="statUser">۴۸</b><span>کاربر فعال</span></div>
-      <div class="stat"><b id="statInv">۳</b><span>دعوت ثبت‌شده</span></div>
-    </div>
-    <div class="vip-note" id="demoNote">این آمار نمونه است — با اشتراک پرمیوم، آمار واقعی گروه شما نمایش داده می‌شود.</div>
+  <div class="section-title">📜 متن قوانین گروه (در خصوصی)</div>
+  <textarea id="rulesText">📜 قوانین گروه:
+۱) احترام متقابل
+۲) بدون تبلیغ
+۳) بدون اسپم</textarea>
+
+  <div class="section-title">👋 پیام به کاربر خارج شده</div>
+  <textarea id="leftText">خداحافظ {user} 👋</textarea>
+
+  <div class="section-title">📢 پیام عضو اجباری</div>
+  <textarea id="forceText">⚠️ {user} عزیز، برای ادامه اول عضو کانال شو:
+{channel}</textarea>
+
+  <div class="section-title">⏳ متن تأیید ورود</div>
+  <textarea id="approvalText">⏳ درخواست عضویت شما در حال بررسی است...</textarea>
+</div>
+
+<!-- ============ مدیران ============ -->
+<div class="card" id="admins">
+  <h2>👮‍♂️ مدیران</h2>
+  <div class="section-title">دسترسی‌های مدیر</div>
+  <div class="row"><div class="label">🛡 پنل مدیریت <div class="desc">دسترسی به تمام بخش‌های پنل</div></div><div class="lock active" data-demo="admFull"></div></div>
+  <div class="row"><div class="label">💬 گفتگو با اسم ربات <div class="desc">مدیران با افزودن <code>%</code> قبل پیام، با اسم ربات چت می‌کنند</div></div><div class="lock" data-demo="admChat"></div></div>
+  <div class="row"><div class="label">📣 مدیر تبلیغات <div class="desc">ارسال و سنجاق پیام زمان‌بندی‌شده</div></div><div class="lock" data-demo="admAds"></div></div>
+  <div class="row"><div class="label">👤 پنل مشخصات کاربر <div class="desc">مشاهدهٔ مشخصات کامل کاربران</div></div><div class="lock" data-demo="admProfile"></div></div>
+</div>
+
+<div class="card">
+  <h2>📊 آمار و وضعیت کلی گروه</h2>
+  <div class="stats-grid">
+    <div class="stat"><b>1,284</b><span>پیام هفته</span></div>
+    <div class="stat"><b>96</b><span>کاربر فعال</span></div>
+    <div class="stat"><b>3</b><span>مدیر</span></div>
   </div>
+  <div class="demo-note">📊 نمودار درآمد، آمار پیام و گزارش خودکار — با خرید اشتراک فعال می‌شود</div>
+</div>
 
-  <div class="section-title">🔐 قفل‌ها</div>
-  <div class="card">
-    <div id="locksList"></div>
-    <div class="demo-note">تغییرات فقط در حالت آزمایشی است؛ با خرید اشتراک روی گروه واقعی شما اعمال می‌شود.</div>
-  </div>
-
-  <div class="section-title">💎 امکانات ویژه</div>
-  <div class="card">
-    <div class="row"><div><div class="label">🧹 پاکسازی خودکار پیام</div><div class="desc">حذف خودکار پیام‌های قدیمی</div></div><div class="lock active"></div></div>
-    <div class="row"><div><div class="label">🎉 قرعه‌کشی گروه</div><div class="desc">برنده‌گیری تصادفی بین اعضا</div></div><div class="lock active"></div></div>
-    <div class="row"><div><div class="label">📊 آمار کامل گروه</div><div class="desc">پیام‌ها، کاربران فعال، برترین‌ها</div></div><div class="lock active"></div></div>
-    <div class="row"><div><div class="label">🔗 لینک دعوت اختصاصی</div><div class="desc">ردیابی دعوت‌ها + پاداش</div></div><div class="lock active"></div></div>
-    <div class="row"><div><div class="label">⛔ ضد اسپم هوشمند</div><div class="desc">محدودیت پیام + ضد تبچی</div></div><div class="lock active"></div></div>
-    <div class="row"><div><div class="label">💤 خاموشی زمان‌بندی‌شده</div><div class="desc">خاموش/روشن خودکار</div></div><div class="lock active"></div></div>
-  </div>
-
-  <div class="section-title">👑 پلن‌های اشتراک</div>
+<div class="card">
+  <h2>👑 پلن‌های اشتراک</h2>
   <div class="plans">
-    <div class="plan" onclick="buyPlan(1)"><div>🥉 یک ماهه</div><div class="price">۹۹٬۰۰۰</div><div class="per">تومان</div></div>
-    <div class="plan" onclick="buyPlan(3)"><div>🥈 سه ماهه</div><div class="price">۲۳۹٬۰۰۰</div><div class="per">تومان</div></div>
-    <div class="plan best" onclick="buyPlan(6)"><div>🥇 شش ماهه ⭐</div><div class="price">۴۲۹٬۰۰۰</div><div class="per">تومان</div></div>
-    <div class="plan" onclick="buyPlan(12)"><div>👑 یک ساله</div><div class="price">۵۸۷٬۰۰۰</div><div class="per">تومان</div></div>
+    <div class="plan" onclick="buyPlan(1)"><div>🥉 یک ماهه</div><div class="price">۹۹,۰۰۰ تومان</div><div class="per">همه امکانات ویژه</div></div>
+    <div class="plan" onclick="buyPlan(3)"><div>🥈 سه ماهه</div><div class="price">۲۳۹,۰۰۰ تومان</div><div class="per">۱۲٪ تخفیف</div></div>
+    <div class="plan best" onclick="buyPlan(6)"><div>🥇 شش ماهه</div><div class="price">۴۲۹,۰۰۰ تومان</div><div class="per">۲۷٪ تخفیف</div></div>
+    <div class="plan" onclick="buyPlan(12)"><div>👑 یک ساله</div><div class="price">۵۸۷,۰۰۰ تومان</div><div class="per">۵۰٪ تخفیف</div></div>
   </div>
-
-  <button class="btn green" onclick="buyPlan(6)">🛒 خرید اشتراک پرمیوم</button>
+  <div class="vip-note">✨ با اشتراک پرمیوم: قفل‌ها، ضد اسپم، خاموشی، قرعه‌کشی، لینک دعوت اختصاصی، پاکسازی خودکار، آمار گروه و همه امکانات ویژه برای گروه واقعی شما فعال می‌شود.</div>
+  <button class="btn green" onclick="buyPlan(6)" style="margin-top:12px">🛒 خرید اشتراک پرمیوم</button>
   <button class="btn secondary" onclick="openBot()">🤖 خرید از داخل ربات</button>
-  <div class="demo-note">© آجُرپاره — نسخهٔ نمایشی</div>
+</div>
+
+<div class="footer-cta">
+  <button class="btn secondary" onclick="resetDemo()">🔄 ریست دمو</button>
+  <button class="btn green" onclick="saveDemo()">💾 ذخیره (نمایشی)</button>
+</div>
+
+<div class="toast" id="toast">✅ ذخیره شد</div>
 
 <script>
-const LOCKS = [
-  ["sticker","استیکر"], ["gif","گیف"], ["video","ویدئو"], ["photo","تصویر"],
-  ["audio","موزیک"], ["voice","ویس"], ["video_note","ویدئو گرد"], ["link","لینک"],
-  ["mention","منشن"], ["forward","فوروارد"], ["spoiler","اسپویلر"], ["document","فایل"]
-];
-const locksEl = document.getElementById("locksList");
-LOCKS.forEach(([key,label]) => {
+const botUrl = "https://t.me/Ajorparehbot";
+
+// قفل‌ها با دسته‌بندی — هم‌تراز TLPro
+const LOCK_CATS = {
+  "🔤 متن": [
+    ["text_only","فقط متن"],["short_text","متن کوتاه"],["long_text","متن بلند"],
+    ["persian_typing","تایپ فارسی"],["english_typing","تایپ انگلیسی"],
+    ["emoji_count","تعداد اموجی"],["custom_emoji_count","تعداد اموجی کاستوم"],
+    ["caption_required","کپشن اجباری"],["template_required","قالب اجباری"]],
+  "🔗 لینک و شناسه": [
+    ["link","لینک"],["link_external","لینک خارجی"],["link_telegram","لینک تلگرامی"],
+    ["link_short","لینک کوتاه"],["link_instagram","لینک اینستاگرام"],["link_email","ایمیل"],
+    ["link_hidden","لینک مخفی (هایپر)"],["link_bot","لینک ربات"],["link_glass","لینک شیشه‌ای"],
+    ["link_bio","لینک بیو"],["channel_id","آیدی کانال/گروه"],["mention","منشن"],
+    ["mention_text","منشن متنی"],["phone","شماره تلفن"],["reply","پاسخ/ریپلای"],["reply_external","ریپلای خارجی"]],
+  "🎬 رسانه": [
+    ["photo","تصویر"],["video","ویدئو"],["audio","موزیک"],["voice","ویس"],
+    ["video_note","ویدئو گرد"],["gif","گیف"],["sticker","استیکر"],["document","فایل"],
+    ["location","لوکیشن"],["poll","نظرسنجی"],["story","استوری"],["game","بازی"],
+    ["app","اپلیکیشن"],["spoiler","اسپویلر"],["nsfw_attach","پیوست مستهجن"],
+    ["nsfw_sticker","استیکر مستهجن"],["edit_text","ویرایش متن"],["edit_caption","ویرایش پیوست"]],
+  "📤 فوروارد": [
+    ["forward","فوروارد"],["forward_channel_public","فوروارد کانال عمومی"],
+    ["forward_channel_private","فوروارد کانال خصوصی"],["forward_user","فوروارد کاربر"]],
+  "🛡 سایر": [
+    ["hidden_identity","هویت مخفی"],["ai","هوش مصنوعی"],["bot_message","پیام رباتی"],
+    ["like","لایک"],["music_finder","موزیک یاب"],["currency_price","قیمت ارزها"],
+    ["bio","بیوگرافی"],["private_chat","چت خصوصی"]],
+};
+
+let activeCat = "🔤 متن";
+const lockStates = {}; // key -> true/false
+
+function renderCatTabs(){
+  const tabs = document.getElementById("catTabs");
+  tabs.innerHTML = "";
+  for(const cat of Object.keys(LOCK_CATS)){
+    const b = document.createElement("button");
+    b.className = "cat-tab" + (cat===activeCat?" active":"");
+    b.textContent = cat;
+    b.onclick = ()=>{ activeCat=cat; renderCatTabs(); renderLocks(); };
+    tabs.appendChild(b);
+  }
+}
+function lockRow(key,label){
   const row = document.createElement("div");
   row.className = "row";
-  row.innerHTML = `<div><div class="label">${label}</div><div class="desc">کاربر عادی قفل — ویژه آزاد</div></div><div class="lock" data-key="${key}"></div>`;
-  row.querySelector(".lock").addEventListener("click", function(){ this.classList.toggle("active"); });
-  locksEl.appendChild(row);
-});
-
-function buyPlan(months) {
-  if (window.Telegram?.WebApp) {
-    window.Telegram.WebApp.close();
+  const extra = key==="video" ? '<div class="mini-row" style="margin-top:6px"><select class="video-mode" style="max-width:130px;font-size:11px"><option value="free">آزاد</option><option value="10mb">بالای 10MB</option><option value="50mb">بالای 50MB</option><option value="100mb">بالای 100MB</option><option value="200mb">بالای 200MB</option><option value="500mb">بالای 500MB</option><option value="all">همه اندازه‌ها</option></select></div>' : '';
+  row.innerHTML = `<div><div class="label">${label}${key==="phone"?' <span class="tag">عادی/حساس</span>':''}</div><div class="desc">کاربر عادی قفل — ویژه آزاد</div>${extra}</div><div class="lock" data-lock="${key}"></div>`;
+  const lock = row.querySelector(".lock");
+  lock.classList.toggle("active", !!lockStates[key]);
+  lock.addEventListener("click", ()=>{
+    lockStates[key] = !lockStates[key];
+    lock.classList.toggle("active");
+  });
+  const modeSel = row.querySelector(".video-mode");
+  if(modeSel) modeSel.value = lockStates[key+"_mode"]||"free";
+  return row;
+}
+function renderLocks(){
+  const list = document.getElementById("locksList");
+  list.innerHTML = "";
+  for(const [key,label] of LOCK_CATS[activeCat]){
+    list.appendChild(lockRow(key,label));
   }
-  const botUrl = "https://t.me/Ajorparehbot";
+}
+// toggle های ساده
+function initDemoToggles(){
+  document.querySelectorAll(".lock[data-demo]").forEach(el=>{
+    el.addEventListener("click", ()=> el.classList.toggle("active"));
+  });
+}
+function buyPlan(months){
+  if(window.Telegram?.WebApp) window.Telegram.WebApp.close();
   window.open(`${botUrl}?start=vip_${months}`, "_blank");
 }
-function openBot() {
-  window.open("https://t.me/Ajorparehbot", "_blank");
+function openBot(){ window.open(botUrl, "_blank"); }
+function saveDemo(){
+  const t = document.getElementById("toast");
+  t.textContent = "✅ تنظیمات دمو ذخیره شد (نمایشی)";
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2200);
 }
-if (window.Telegram?.WebApp) {
-  window.Telegram.WebApp.ready();
-  window.Telegram.WebApp.expand();
+function resetDemo(){
+  Object.keys(lockStates).forEach(k=>delete lockStates[k]);
+  renderLocks();
+  document.querySelectorAll(".lock[data-demo]").forEach(el=>el.classList.remove("active"));
+  const t = document.getElementById("toast");
+  t.textContent = "🔄 دمو ریست شد";
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 2200);
 }
+renderCatTabs();
+renderLocks();
+initDemoToggles();
+if(window.Telegram?.WebApp){ window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); }
 </script>
 </body>
 </html>

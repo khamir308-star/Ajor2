@@ -625,6 +625,58 @@ async def download_youtube_audio_cobalt(session: aiohttp.ClientSession, url: str
     return await _cobalt_download(session, url, output_dir, "audio", max_bytes)
 
 
+async def list_youtube_formats(url: str) -> list[dict]:
+    """لیست کیفیت‌های قابل دانلود یوتیوب با حجم تقریبی (فقط metadata — سریع).
+
+    با yt-dlp فرمت‌های ویدئویی را استخراج می‌کند (بدون دانلود) و برمی‌گرداند:
+    [{height, ext, filesize_mb, format_note}]. اگر yt-dlp جواب ندهد [] برمی‌گرداند.
+    """
+    try:
+        import yt_dlp
+    except ImportError:
+        return []
+    try:
+        with yt_dlp.YoutubeDL({
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "socket_timeout": 15,
+            "noplaylist": True,
+        }) as ydl:
+            info = ydl.extract_info(url, download=False)
+    except Exception:
+        return []
+    formats: list[dict] = []
+    seen: set[tuple] = set()
+    entries = info.get("entries") or [info]
+    for entry in entries:
+        if not entry:
+            continue
+        for f in entry.get("formats") or []:
+            height = int(f.get("height") or 0)
+            ext = str(f.get("ext") or "mp4")
+            if height < 144 or "video" not in str(f.get("vcodec") or ""):
+                continue
+            filesize = int(f.get("filesize") or f.get("filesize_approx") or 0)
+            if filesize <= 0:
+                # تخمین: ویدئو 1 دقیقه‌ای 720p تقریباً 10MB
+                duration = float(entry.get("duration") or 0)
+                filesize = int(duration * height * 0.014 * 1024 * 1024)
+            key = (height, ext)
+            if key in seen:
+                continue
+            seen.add(key)
+            formats.append({
+                "height": height,
+                "ext": ext,
+                "filesize_mb": round(filesize / 1024 / 1024, 1),
+                "format_note": str(f.get("format_note") or f"{height}p"),
+            })
+    # مرتب‌سازی: بالاترین کیفیت اول
+    formats.sort(key=lambda x: -x["height"])
+    return formats[:8]
+
+
 async def download_youtube_video_cobalt(session: aiohttp.ClientSession, url: str, output_dir: str,
                                         max_bytes: int = 300 * 1024 * 1024, quality: str = "360") -> DownloadedMedia:
     return await _cobalt_download(session, url, output_dir, "video", max_bytes, quality)

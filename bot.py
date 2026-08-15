@@ -94,6 +94,7 @@ from music_service import (
     download_preview,
     download_youtube_audio_cobalt,
     download_youtube_video_cobalt,
+    list_youtube_formats,
     recognize_audio,
     search_songs,
     search_iranian_songs,
@@ -1414,6 +1415,7 @@ music_playlist_upload_sessions: dict[int, int] = {}
 music_search_cache: dict[int, list[dict]] = {}
 quick_quiz_recent: dict[int, list[int]] = {}
 hokm_rooms: dict[str, HokmGame] = {}  # اتاق‌های بازی حکم آنلاین (حافظه + Redis)
+youtube_quality_sessions: dict[int, dict] = {}  # {user_id: {"url": ..., "formats": [...]}}
 duel_rooms: dict[str, dict] = {}  # اتاق‌های دوئل ۱v۱
 
 
@@ -4919,19 +4921,55 @@ def media_progress_bar(percent: int) -> str:
     return f"{bar} {percent}%"
 
 
-async def _safe_edit_progress(msg, pct: int, size_text: str = "") -> None:
-    """ویرایش امن پیام پیشرفت (از thread sync صدا زده می‌شه)."""
+def _fmt_duration(seconds: float) -> str:
+    """فرمت زمان: 00:15 یا 01:02:33."""
+    seconds = max(0, int(seconds))
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h:02d}:{m:02d}:{s:02d}"
+    return f"{m:02d}:{s:02d}"
+
+
+def _fmt_speed(bytes_per_sec: float) -> str:
+    """فرمت سرعت: KB/s یا MB/s."""
+    if bytes_per_sec >= 1024 * 1024:
+        return f"{bytes_per_sec / 1024 / 1024:.1f} MB/s"
+    return f"{bytes_per_sec / 1024:.1f} KB/s"
+
+
+def _fmt_size(num_bytes: float) -> str:
+    """فرمت حجم: MB/GB."""
+    if num_bytes >= 1024 * 1024 * 1024:
+        return f"{num_bytes / 1024 / 1024 / 1024:.2f} GB"
+    return f"{num_bytes / 1024 / 1024:.1f} MB"
+
+
+async def _safe_edit_progress(msg, pct: int, size_text: str = "", speed: float = 0.0,
+                              elapsed: float = 0.0, remaining: float = 0.0, stage: str = "") -> None:
+    """ویرایش امن پیام پیشرفت (از thread sync صدا زده می‌شه) — با سرعت و زمان‌سنج."""
     if msg is None:
         return
+    lines = [
+        "⏳ <b>در حال دریافت رسانه…</b>",
+        f"<code>{media_progress_bar(pct)}</code>",
+        f"{pct}%",
+    ]
+    if size_text:
+        lines.append(f"📦 حجم: {size_text}")
+    if speed > 0:
+        lines.append(f"⚡ سرعت: <b>{_fmt_speed(speed)}</b>")
+    if elapsed > 0:
+        lines.append(f"⏱ زمان سپری‌شده: <code>{_fmt_duration(elapsed)}</code>")
+    if remaining > 0 and pct < 100:
+        lines.append(f"🔜 زمان باقی‌مانده: <code>{_fmt_duration(remaining)}</code>")
+    if stage:
+        lines.append(f"🔄 {stage}")
+    lines.append("")
+    lines.append("⚠️ فایل و پیام‌ها بعد از <b>۳۰ ثانیه</b> خودکار پاک می‌شن.")
+    lines.append("برای نگهداشتن، بعد از دریافت فایل رو به «پیام‌های ذخیره‌شده» (Saved Messages) فوروارد کن.")
     try:
-        await msg.edit_text(
-            "⏳ <b>در حال دریافت رسانه…</b>\n"
-            f"<code>{media_progress_bar(pct)}</code>\n"
-            f"{size_text}\n\n"
-            "⚠️ فایل و پیام‌ها بعد از <b>۳۰ ثانیه</b> خودکار پاک می‌شن.\n"
-            "برای نگهداشتن، بعد از دریافت فایل رو به «پیام‌های ذخیره‌شده» (Saved Messages) فوروارد کن.",
-            parse_mode="HTML",
-        )
+        await msg.edit_text("\n".join(lines), parse_mode="HTML")
     except Exception:
         pass
 
@@ -5037,15 +5075,27 @@ async def process_media_job(job: dict) -> None:
                         last_social_pct["pct"] = pct
                         last_social_pct["at"] = now
                         size_text = ""
+                        speed = 0.0
+                        elapsed = 0.0
+                        remaining = 0.0
                         if received > 0:
-                            size_text = f"{received / 1024 / 1024:.1f} MB"
+                            size_text = _fmt_size(received)
                             if total > 0:
-                                size_text += f" از {total / 1024 / 1024:.1f} MB"
+                                size_text += f" از {_fmt_size(total)}"
+                        # محاسبهٔ سرعت و زمان‌ها
+                        if last_social_pct.get("start") is None:
+                            last_social_pct["start"] = now
+                            last_social_pct["last_recv"] = received
+                        elapsed = now - last_social_pct["start"]
+                        if elapsed >= 2 and received > last_social_pct.get("last_recv", 0):
+                            speed = (received - last_social_pct["last_recv"]) / elapsed
+                        if speed > 0 and total > received > 0:
+                            remaining = (total - received) / speed
                         try:
                             loop = asyncio.get_event_loop()
                             if loop.is_running():
                                 asyncio.run_coroutine_threadsafe(
-                                    _safe_edit_progress(progress_message, pct, size_text),
+                                    _safe_edit_progress(progress_message, pct, size_text, speed, elapsed, remaining),
                                     loop,
                                 )
                         except Exception:
@@ -5062,7 +5112,8 @@ async def process_media_job(job: dict) -> None:
                         raise
                     log.info("trying cobalt video fallback for %s", job["_id"])
                     try:
-                        item = await download_youtube_video_cobalt(http_session, job.get("url", ""), folder, quality="360")
+                        yt_q = str(job.get("youtube_quality") or "360")
+                        item = await download_youtube_video_cobalt(http_session, job.get("url", ""), folder, quality=yt_q)
                         title, items = item.title, [item]
                     except Exception as cobalt_video_exc:
                         log.warning("cobalt video fallback failed: %s", cobalt_video_exc)
@@ -5668,6 +5719,58 @@ async def link_check_command(message: types.Message):
         return await send_link_inspection(message, url)
     media_request_sessions[message.from_user.id] = "inspect"
     await message.answer("🛡 لینک کامل رو بفرست. /cancel", reply_markup=media_download_reply_menu())
+
+
+@dp.callback_query(F.data.startswith("ytq:"))
+async def youtube_quality_callback(callback: types.CallbackQuery):
+    """انتخاب کیفیت ویدئو یوتیوب — سپس job با همان کیفیت ساخته می‌شود."""
+    user_id = callback.from_user.id
+    session = youtube_quality_sessions.get(user_id) or {}
+    url = str(session.get("url") or "")
+    if not url:
+        return await callback.answer("لینک یوتیوب منقضی شد؛ دوباره بفرست.", show_alert=True)
+    try:
+        quality = int(callback.data.split(":", 1)[1])
+    except (ValueError, IndexError):
+        return await callback.answer("کیفیت نامعتبر است.", show_alert=True)
+    youtube_quality_sessions.pop(user_id, None)
+    await callback.answer(f"🎬 کیفیت {quality}p انتخاب شد")
+    try:
+        job = await enqueue_media_job(user_id, url, "social", "bot", youtube_quality=str(quality))
+    except MediaServiceError as exc:
+        return await callback.message.answer(f"❌ {exc.message}", reply_markup=media_download_reply_menu())
+    await callback.message.answer(
+        f"✅ درخواست دانلود یوتیوب با کیفیت <b>{quality}p</b> در صف قرار گرفت.\n"
+        f"شناسه: <code>{job['_id']}</code>\n"
+        "نتیجه بعد از دریافت مستقیم به همین چت فرستاده می‌شه.",
+        parse_mode="HTML", reply_markup=media_download_reply_menu(),
+    )
+
+
+async def maybe_show_youtube_qualities(message: types.Message, url: str) -> bool:
+    """اگر لینک یوتیوب باشد، کیفیت‌ها را با حجم نشان می‌دهد. True اگر نمایش داد."""
+    host = normalized_host(url)
+    if "youtube" not in host and "youtu.be" not in host:
+        return False
+    try:
+        formats = await list_youtube_formats(url)
+    except Exception:
+        formats = []
+    if not formats:
+        return False
+    youtube_quality_sessions[message.from_user.id] = {"url": url, "formats": formats}
+    rows = []
+    for f in formats[:6]:
+        label = f"{f['height']}p ({f['ext']}) - {f['filesize_mb']}MB"
+        rows.append([InlineKeyboardButton(text=f"🎬 {label}", callback_data=f"ytq:{f['height']}")])
+    rows.append([InlineKeyboardButton(text="⚡ دانلود مستقیم (بدون انتخاب)", callback_data="youtube")])
+    await message.answer(
+        "🎬 <b>انتخاب کیفیت یوتیوب</b>\n\n"
+        "کیفیت مورد نظرت رو انتخاب کن:",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
+    )
+    return True
 
 
 @dp.callback_query(F.data == "youtube")

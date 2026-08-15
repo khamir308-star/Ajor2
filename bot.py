@@ -7833,6 +7833,49 @@ async def _anon_bot_username() -> str:
     return username
 
 
+_anon_tl_client: object | None = None  # کلاینت Telethon (MTProto) — lazy ساخته می‌شود
+_anon_tl_lock = asyncio.Lock()
+
+
+async def _anon_tl_resolve_username(username: str) -> tuple[int, str] | None:
+    """پیدا کردن گیرنده با @username از طریق MTProto (Telethon).
+
+    Bot API عادی فقط کاربرانی را می‌شناسد که قبلاً با ربات چت کرده‌اند؛
+    اما MTProto با bot token می‌تواند هر @username عمومی را resolve کند.
+    """
+    global _anon_tl_client
+    api_id = int(os.getenv("TELEGRAM_API_ID", "0") or 0)
+    api_hash = (os.getenv("TELEGRAM_API_HASH", "") or "").strip()
+    if not api_id or not api_hash:
+        return None
+    try:
+        async with _anon_tl_lock:
+            if _anon_tl_client is None:
+                from telethon import TelegramClient
+                from telethon.sessions import StringSession
+                _anon_tl_client = TelegramClient(StringSession(), api_id, api_hash)
+                await _anon_tl_client.start(bot_token=TOKEN)
+        entity = await _anon_tl_client.get_entity(username)
+        if not entity:
+            return None
+        from telethon.tl.types import User
+        if isinstance(entity, User) and not getattr(entity, "bot", False):
+            display = " ".join(
+                filter(None, [getattr(entity, "first_name", ""), getattr(entity, "last_name", "")])
+            ).strip() or f"@{username}"
+            return entity.id, display
+        # کانال/گروه/ربات — id برگردانده می‌شود؛ ارسال ممکن است ناموفق باشد
+        title = (
+            getattr(entity, "title", "")
+            or getattr(entity, "first_name", "")
+            or f"@{username}"
+        )
+        return entity.id, title
+    except Exception as exc:
+        log.warning("anon telethon resolve failed for @%s: %s", username, exc)
+        return None
+
+
 async def _anon_resolve_username(username: str) -> tuple[int, str] | None:
     """پیدا کردن کاربر با @username از طریق Telegram (برای گیرندگانی که در DB نیستند)."""
     try:
@@ -7840,10 +7883,11 @@ async def _anon_resolve_username(username: str) -> tuple[int, str] | None:
         if chat and chat.type == "private":
             return chat.id, chat.full_name or f"@{username}"
     except (TelegramForbiddenError, TelegramBadRequest, ValueError):
-        return None
+        pass
     except Exception as exc:
         log.warning("anon get_chat failed for @%s: %s", username, exc)
-    return None
+    # تلاش نهایی: MTProto — حتی کاربرانی که ربات را استارت نکرده‌اند پیدا می‌شوند
+    return await _anon_tl_resolve_username(username)
 
 
 anon_chat.resolve_username_hook = _anon_resolve_username

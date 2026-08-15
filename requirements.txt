@@ -6,3 +6,4 @@ dnspython==2.8.0
 qrcode[pil]==8.2
 Pillow==12.3.0
 defusedxml==0.7.1
+telethon==1.44.0

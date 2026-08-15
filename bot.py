@@ -77,6 +77,7 @@ from calendar_service import (
 )
 import vip_service
 import group_guard
+import anon_chat
 from tools_service import (
     book_search,
     country_info,
@@ -268,6 +269,7 @@ cleanup_messages_col = db["cleanup_messages"]  # پیام‌های ربات بر
 group_stats_col = db["group_stats"]  # آمار پیام‌های گروه
 raffles_col = db["group_raffles"]  # قرعه‌کشی‌های گروه
 invite_stats_col = db["invite_stats"]  # آمار دعوت‌های اختصاصی
+anon_messages_col = db["anon_messages"]  # پیام‌های چت ناشناس
 
 # اتصال ماژول vip_service به کالکشن‌ها
 vip_service.users_col = users_col
@@ -280,6 +282,11 @@ group_guard.group_settings_col = group_settings_col
 group_guard.users_col = users_col
 group_guard.warnings_col = warnings_col
 group_guard.log = log
+
+# اتصال anon_chat به کالکشن‌ها
+anon_chat.anon_messages_col = anon_messages_col
+anon_chat.users_col = users_col
+anon_chat.log = log
 
 ai_service = AIService(AIConfig.from_env(), ai_usage_col, ai_provider_metrics_col, users_col)
 
@@ -1320,7 +1327,7 @@ REPLY_BUTTON_LABELS: set[str] = {
     # منوی اصلی
     "🎮 بازی‌ها", "🎁 جوایز و کیف پول", "📰 اخبار و ترندها", "🧰 ابزارهای ربات",
     "📱 QR ساز", "🎨 گیف و استیکرساز", "🤖 هوش مصنوعی", "🛍 سرویس اختصاصی",
-    "💬 پشتیبانی", "⚙️ پنل مدیریت",
+    "💬 پشتیبانی", "⚙️ پنل مدیریت", "🎭 چت ناشناس",
     # منوی بازی‌ها
     "🏃 بزن در رو", "🧠 کوئیز فوری", "🎲 تاس", "🎯 دارت",
     "🪨 سنگ‌کاغذ‌قیچی", "🪙 شیر یا خط", "🔢 حدس عدد", "🎭 جرأت یا حقیقت",
@@ -1437,6 +1444,9 @@ hokm_rooms: dict[str, HokmGame] = {}  # اتاق‌های بازی حکم آنل
 youtube_quality_sessions: dict[int, dict] = {}  # {user_id: {"url": ..., "formats": [...]}}
 vip_card_sessions: set[int] = set()  # ادمین در حال وارد کردن شماره کارت برای سفارش
 vip_receipt_sessions: set[int] = set()  # کاربر در حال ارسال رسید برای سفارش
+anon_sessions: dict[int, dict] = {}  # چت ناشناس: {user_id: {"step": "alias"|"target"|"msg", ...}}
+anon_reply_sessions: dict[int, str] = {}  # {user_id: token} — کاربر در حال نوشتن پاسخ ناشناس
+_anon_bot_username_cache: dict[str, object] = {"value": "", "at": 0.0}
 duel_rooms: dict[str, dict] = {}  # اتاق‌های دوئل ۱v۱
 
 
@@ -2776,7 +2786,7 @@ def chat_reply_menu(user_id: int | None = None) -> ReplyKeyboardMarkup:
         [KeyboardButton(text="📰 اخبار و ترندها"), KeyboardButton(text="🧰 ابزارهای ربات")],
         [KeyboardButton(text="🎨 گیف و استیکرساز")],
         [KeyboardButton(text="🤖 هوش مصنوعی"), KeyboardButton(text="🛍 سرویس اختصاصی")],
-        [KeyboardButton(text="💬 پشتیبانی")],
+        [KeyboardButton(text="🎭 چت ناشناس"), KeyboardButton(text="💬 پشتیبانی")],
     ]
     if user_id is not None and is_admin(user_id):
         rows.append([KeyboardButton(text="⚙️ پنل مدیریت")])
@@ -4092,6 +4102,10 @@ async def start(message: types.Message):
             else:
                 await message.answer("❌ فایل مورد نظر یافت نشد.")
                 return
+        if text_parts[1].startswith("anon_"):
+            token = text_parts[1][len("anon_"):].strip()
+            if token:
+                return await show_anon_message(message, token)
 
     await log_activity(user_id, "start", "استارت ربات")
 
@@ -7722,6 +7736,12 @@ async def cancel_guess(message: types.Message):
     elif user_id in vip_receipt_sessions:
         vip_receipt_sessions.discard(user_id)
         await message.answer("❌ ارسال رسید لغو شد.")
+    elif user_id in anon_reply_sessions:
+        anon_reply_sessions.pop(user_id, None)
+        await message.answer("❌ پاسخ ناشناس لغو شد.", reply_markup=chat_reply_menu(user_id))
+    elif user_id in anon_sessions:
+        anon_sessions.pop(user_id, None)
+        await message.answer("❌ ساخت پیام ناشناس لغو شد.", reply_markup=chat_reply_menu(user_id))
     elif user_id in economy_setting_sessions:
         economy_setting_sessions.pop(user_id, None)
         await message.answer("❌ تغییر تنظیم اقتصادی لغو شد.")
@@ -7795,9 +7815,330 @@ async def cancel_guess(message: types.Message):
         else:
             await message.answer("⚠️ شما در حال حاضر هیچ عملیات فعالی ندارید.")
 
+
+# ==================== چت ناشناس 🎭 ====================
+
+async def _anon_bot_username() -> str:
+    """یوزرنیم ربات با کش ۱ ساعته برای ساخت لینک پیام ناشناس."""
+    cached = _anon_bot_username_cache
+    if cached["value"] and time.monotonic() - float(cached["at"]) < 3600:
+        return str(cached["value"])
+    try:
+        info = await bot.get_me()
+        username = info.username or "Ajorparehbot"
+    except Exception:
+        username = "Ajorparehbot"
+    cached["value"] = username
+    cached["at"] = time.monotonic()
+    return username
+
+
+async def _anon_resolve_username(username: str) -> tuple[int, str] | None:
+    """پیدا کردن کاربر با @username از طریق Telegram (برای گیرندگانی که در DB نیستند)."""
+    try:
+        chat = await bot.get_chat(username)
+        if chat and chat.type == "private":
+            return chat.id, chat.full_name or f"@{username}"
+    except (TelegramForbiddenError, TelegramBadRequest, ValueError):
+        return None
+    except Exception as exc:
+        log.warning("anon get_chat failed for @%s: %s", username, exc)
+    return None
+
+
+anon_chat.resolve_username_hook = _anon_resolve_username
+
+
+async def _anon_link(token: str) -> str:
+    username = await _anon_bot_username()
+    return f"https://t.me/{username}?start=anon_{token}"
+
+
+def _anon_delivery_keyboard(link: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📩 دیدن پیام ناشناس", url=link)],
+        [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="back_main_menu")],
+    ])
+
+
+async def start_anon_chat(message: types.Message):
+    user_id = message.from_user.id
+    if user_id in anon_sessions or user_id in anon_reply_sessions:
+        return await message.answer(
+            "⚠️ الان یک چت ناشناس در حال ساختن داری؛ اول /cancel بزن تا دوباره شروع کنی.",
+            reply_markup=chat_reply_menu(user_id),
+        )
+    sent_today = await anon_chat.daily_sent_count(user_id)
+    if sent_today >= anon_chat.DAILY_LIMIT:
+        return await message.answer(
+            f"⚠️ امروز به سقف {anon_chat.DAILY_LIMIT} پیام ناشناس رسیدی عزیزم؛ فردا دوباره بیا 😉",
+            reply_markup=chat_reply_menu(user_id),
+        )
+    anon_sessions[user_id] = {"step": "alias"}
+    return await message.answer(
+        "🎭 <b>چت ناشناس</b>\n\n"
+        "👻 پیامت بدون افشای هویت به گیرنده می‌رسه و اون فقط با یک <b>لینک اختصاصی</b> می‌تونه بخونتش.\n\n"
+        f"<b>قدم ۱ از ۳:</b> یک <b>اسم مستعار</b> برای خودت انتخاب کن ({anon_chat.ALIAS_MIN} تا {anon_chat.ALIAS_MAX} حرف).\n"
+        "مثلاً: «شبح»، «دوست مخفی»، «فانوس»، «همسایه»...\n"
+        "/cancel برای انصراف",
+        parse_mode="HTML",
+        reply_markup=chat_reply_menu(user_id),
+    )
+
+
+async def handle_anon_step_text(message: types.Message):
+    """پردازش مراحل ۳گانهٔ ساخت پیام ناشناس؛ اگر session نبود None برمی‌گرداند."""
+    user_id = message.from_user.id
+    session = anon_sessions.get(user_id)
+    if not session:
+        return None
+    text = (message.text or "").strip()
+    if text in {"🏠 منوی اصلی", "منو", "منوی اصلی"}:
+        anon_sessions.pop(user_id, None)
+        return await handle_menu_trigger(message)
+    step = session.get("step")
+
+    if step == "alias":
+        error = anon_chat.validate_alias(text)
+        if error:
+            return await message.answer(
+                f"❌ {error}\nدوباره اسم مستعار رو بفرست یا /cancel.",
+                reply_markup=chat_reply_menu(user_id),
+            )
+        session["alias"] = text[:anon_chat.ALIAS_MAX]
+        session["step"] = "target"
+        return await message.answer(
+            f"✅ اسم مستعارت: «{html.escape(session['alias'])}» 👌\n\n"
+            "<b>قدم ۲ از ۳:</b> حالا <b>آیدی تلگرام گیرنده</b> رو بفرست:\n"
+            "• عددی: مثلاً <code>123456789</code>\n"
+            "• یوزرنیم: مثلاً <code>@username</code>\n\n"
+            "💡 اگه آیدی عددی رو نداری، از <code>@userinfobot</code> بگیر.\n"
+            "/cancel برای انصراف",
+            parse_mode="HTML",
+            reply_markup=chat_reply_menu(user_id),
+        )
+
+    if step == "target":
+        target_id, display, error = await anon_chat.resolve_target_id(text)
+        if error:
+            return await message.answer(
+                f"❌ {error}\nدوباره آیدی رو بفرست یا /cancel.",
+                reply_markup=chat_reply_menu(user_id),
+            )
+        if target_id == user_id:
+            return await message.answer(
+                "😅 نمی‌شه به خودت پیام ناشناس بفرستی! یه نفر دیگه رو انتخاب کن یا /cancel.",
+                reply_markup=chat_reply_menu(user_id),
+            )
+        session["target_id"] = target_id
+        session["target_name"] = display or str(target_id)
+        session["step"] = "msg"
+        return await message.answer(
+            f"✅ گیرنده: <b>{html.escape(session['target_name'])}</b> 🎯\n\n"
+            "<b>قدم ۳ از ۳:</b> حالا <b>متن پیامت</b> رو بنویس "
+            f"(فقط متن، تا {anon_chat.TEXT_MAX} کاراکتر).\n"
+            "پیامت با لینک اختصاصی به گیرنده می‌رسه و هویتت مخفی می‌مونه 🤫\n"
+            "/cancel برای انصراف",
+            parse_mode="HTML",
+            reply_markup=chat_reply_menu(user_id),
+        )
+
+    if step == "msg":
+        if not text:
+            return await message.answer(
+                "❌ پیام خالی بود؛ متن پیامت رو بنویس یا /cancel.",
+                reply_markup=chat_reply_menu(user_id),
+            )
+        if len(text) > anon_chat.TEXT_MAX:
+            return await message.answer(
+                f"❌ پیامت خیلی طولانیه؛ حداکثر {anon_chat.TEXT_MAX} کاراکتر مجازه. کوتاه‌ترش کن یا /cancel.",
+                reply_markup=chat_reply_menu(user_id),
+            )
+        alias = session.get("alias") or "ناشناس"
+        target_id = int(session.get("target_id") or 0)
+        target_name = session.get("target_name") or str(target_id)
+        anon_sessions.pop(user_id, None)
+
+        doc = await anon_chat.create_message(user_id, alias, target_id, text)
+        if not doc:
+            return await message.answer(
+                "❌ ذخیرهٔ پیام ناموفق بود؛ چند لحظه بعد دوباره تلاش کن.",
+                reply_markup=chat_reply_menu(user_id),
+            )
+        link = await _anon_link(doc["_id"])
+
+        # تلاش برای ارسال مستقیم لینک به گیرنده
+        delivered = False
+        try:
+            await bot.send_message(
+                target_id,
+                f"👻 <b>پیام ناشناس داری!</b>\n\n"
+                f"یکی با اسم مستعار «{html.escape(alias)}» برات پیام فرستاده.\n"
+                "برای خوندنش روی دکمهٔ زیر بزن:",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="📩 دیدن پیام ناشناس", url=link)],
+                ]),
+            )
+            delivered = True
+            await anon_chat.mark_delivered(doc["_id"])
+        except (TelegramForbiddenError, TelegramBadRequest):
+            delivered = False
+        except Exception as exc:
+            log.warning("anon deliver failed: %s", exc)
+            delivered = False
+
+        delivery_note = (
+            "📨 لینک هم مستقیم برای گیرنده ارسال شد."
+            if delivered
+            else "⚠️ گیرنده هنوز ربات رو استارت نکرده، پس لینک مستقیم براش ارسال نشد.\n"
+                 "می‌تونی خودت لینک رو براش بفرستی، یا صبر کن استارت کنه و بعد دوباره امتحان کنی."
+        )
+        return await message.answer(
+            "✅ <b>پیام ناشناس فرستاده شد!</b> 🎉\n\n"
+            f"👤 گیرنده: <b>{html.escape(target_name)}</b>\n"
+            f"🎭 اسم مستعار: <b>{html.escape(alias)}</b>\n\n"
+            f"🔗 <b>لینک پیام:</b>\n<code>{link}</code>\n\n"
+            f"{delivery_note}\n\n"
+            "📌 هر کسی لینک رو داشته باشه می‌تونه پیام رو بخونه و ناشناس جواب بده.",
+            parse_mode="HTML",
+            reply_markup=_anon_delivery_keyboard(link),
+        )
+
+    # مرحلهٔ ناشناخته — ریست
+    anon_sessions.pop(user_id, None)
+    return None
+
+
+async def handle_anon_reply_text(message: types.Message):
+    """پردازش پاسخ ناشناس به یک پیام؛ اگر session نبود None برمی‌گرداند."""
+    user_id = message.from_user.id
+    token = anon_reply_sessions.get(user_id)
+    if not token:
+        return None
+    text = (message.text or "").strip()
+    if text in {"🏠 منوی اصلی", "منو", "منوی اصلی"}:
+        anon_reply_sessions.pop(user_id, None)
+        return await handle_menu_trigger(message)
+    original = await anon_chat.get_message(token)
+    if not original:
+        anon_reply_sessions.pop(user_id, None)
+        return await message.answer(
+            "❌ پیام اصلی پیدا نشد یا منقضی شده بود.",
+            reply_markup=chat_reply_menu(user_id),
+        )
+    if not text:
+        return await message.answer(
+            "❌ پیام خالی بود؛ جوابت رو بنویس یا /cancel.",
+            reply_markup=chat_reply_menu(user_id),
+        )
+    if len(text) > anon_chat.TEXT_MAX:
+        return await message.answer(
+            f"❌ جوابت خیلی طولانیه؛ حداکثر {anon_chat.TEXT_MAX} کاراکتر مجازه. /cancel",
+            reply_markup=chat_reply_menu(user_id),
+        )
+    anon_reply_sessions.pop(user_id, None)
+
+    reply_doc = await anon_chat.create_message(
+        sender_id=user_id,
+        sender_alias="پاسخ ناشناس",
+        target_id=original["sender_id"],
+        text=text,
+        reply_to=original["_id"],
+    )
+    if not reply_doc:
+        return await message.answer(
+            "❌ ذخیرهٔ پاسخ ناموفق بود؛ چند لحظه بعد دوباره تلاش کن.",
+            reply_markup=chat_reply_menu(user_id),
+        )
+    link = await _anon_link(reply_doc["_id"])
+
+    # اطلاع به فرستندهٔ اصلی پیام
+    delivered = False
+    try:
+        await bot.send_message(
+            original["sender_id"],
+            "💬 <b>جواب پیام ناشناس اومده!</b>\n\n"
+            "به پیام ناشناس قبلی‌ات که با لینک فرستاده بودی، جواب داده‌اند.\n"
+            "برای خوندنش روی دکمهٔ زیر بزن:",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📩 دیدن جواب", url=link)],
+            ]),
+        )
+        delivered = True
+        await anon_chat.mark_delivered(reply_doc["_id"])
+    except (TelegramForbiddenError, TelegramBadRequest):
+        delivered = False
+    except Exception as exc:
+        log.warning("anon reply deliver failed: %s", exc)
+        delivered = False
+
+    if delivered:
+        note = "✅ جوابت مستقیم برای فرستندهٔ اصلی ارسال شد."
+    else:
+        note = f"🔗 لینک جوابت (فرستندهٔ اصلی ربات رو استارت نکرده، خودت بفرستش):\n<code>{link}</code>"
+    return await message.answer(
+        "💬 <b>پاسخ ناشناس ارسال شد!</b>\n\n"
+        f"{note}\n\n"
+        "🤫 هویتت هیچ‌جا فاش نشد؛ گیرنده فقط «پاسخ ناشناس» رو می‌بینه.",
+        parse_mode="HTML",
+        reply_markup=chat_reply_menu(user_id),
+    )
+
+
+async def show_anon_message(message: types.Message, token: str):
+    """نمایش پیام ناشناس برای گیرنده (از طریق لینک اختصاصی)."""
+    user_id = message.from_user.id
+    doc = await anon_chat.get_message(token)
+    if not doc:
+        return await message.answer(
+            "❌ این پیام ناشناس پیدا نشد یا منقضی شده. 👻",
+            reply_markup=chat_reply_menu(user_id),
+        )
+    await anon_chat.mark_read(token)
+    created = doc.get("created_at")
+    created_text = format_tehran_datetime(created) if created else ""
+    text = (
+        "👻 <b>پیام ناشناس</b>\n\n"
+        f"🎭 از طرف: «{html.escape(doc.get('sender_alias') or 'ناشناس')}»\n"
+        f"📅 {created_text}\n\n"
+        f"{html.escape(doc.get('text') or '')}"
+    )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💬 پاسخ ناشناس بده", callback_data=f"anon_reply:{token}")],
+    ])
+    return await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+
+
+@dp.callback_query(F.data.startswith("anon_reply:"))
+async def anon_reply_callback(callback: types.CallbackQuery):
+    token = callback.data.split(":", 1)[1]
+    doc = await anon_chat.get_message(token)
+    if not doc:
+        return await callback.answer("❌ پیام پیدا نشد یا منقضی شده.", show_alert=True)
+    anon_reply_sessions[callback.from_user.id] = token
+    await callback.message.answer(
+        "💬 <b>پاسخ ناشناس</b>\n\n"
+        f"جوابت رو بنویس (تا {anon_chat.TEXT_MAX} کاراکتر).\n"
+        "ناشناس می‌مونه و برای فرستندهٔ اصلی پیام می‌ره 🤫\n"
+        "/cancel برای انصراف",
+        parse_mode="HTML",
+    )
+    return await callback.answer("حالت پاسخ ناشناس فعال شد ✅")
+
 @dp.message(F.text.func(lambda t: t and t.isdigit()))
 async def handle_numeric_input(message: types.Message):
     user_id = message.from_user.id
+    # چت ناشناس — آیدی عددی گیرنده یا پیام/پاسخ عددی
+    if user_id in anon_reply_sessions:
+        result = await handle_anon_reply_text(message)
+        if result is not None:
+            return
+    if user_id in anon_sessions:
+        result = await handle_anon_step_text(message)
+        if result is not None:
+            return
     if user_id in qr_sessions:
         qr_sessions.discard(user_id)
         await send_qr_result(message, message.text)
@@ -16696,6 +17037,16 @@ async def handle_text(message: types.Message):
     if is_admin(user_id) and user_id in scheduled_edit_sessions:
         return await replace_scheduled_payload(message)
 
+    # چت ناشناس — مراحل و پاسخ‌ها باید قبل از کلیدواژه و AI اجرا شوند
+    if user_id in anon_reply_sessions:
+        result = await handle_anon_reply_text(message)
+        if result is not None:
+            return
+    if user_id in anon_sessions:
+        result = await handle_anon_step_text(message)
+        if result is not None:
+            return
+
     # پاک‌سازی خودکار پیام دکمه‌های ReplyKeyboard — چت شلوغ نشه
     if text in REPLY_BUTTON_LABELS:
         asyncio.create_task(_auto_delete_button_msg(message, 0.3))
@@ -17443,6 +17794,8 @@ async def handle_text(message: types.Message):
         )
     if text == "💬 پشتیبانی":
         return await message.answer("💬 منوی پشتیبانی باز شد:", reply_markup=support_reply_menu())
+    if text == "🎭 چت ناشناس":
+        return await start_anon_chat(message)
     if text == "📖 معرفی ربات":
         return await message.answer(about_bot_text(), reply_markup=support_reply_menu(), parse_mode="HTML")
     if text == "⚙️ پنل مدیریت":
@@ -17779,9 +18132,9 @@ async def handle_text(message: types.Message):
         await ai_msg.edit_text(random.choice(FUNNY_FALLBACKS))
 
 def clear_user_transient_sessions(user_id: int):
-    for collection in [guess_games, hit_run_sessions, memory_games, twenty_one_games, calculator_sessions, broadcast_targets, config_upload_sessions, admin_search_sessions, admin_role_sessions, economy_setting_sessions, reschedule_sessions, ticket_reply_sessions, manual_balance_sessions, ai_sessions, casual_chat_history, promo_sticker_sessions, service_shop_setting_sessions, service_delivery_sessions, service_receipt_sessions, media_request_sessions, prompt_image_sessions, music_search_sessions, music_recognize_sessions, music_playlist_upload_sessions, music_search_cache, quick_quiz_recent, tts_sessions, short_sessions, summarize_sessions, instant_repost_sessions, repost_edit_sessions, scheduled_add_sessions, scheduled_edit_sessions, greeting_add_sessions, greeting_edit_sessions]:
+    for collection in [guess_games, hit_run_sessions, memory_games, twenty_one_games, calculator_sessions, broadcast_targets, config_upload_sessions, admin_search_sessions, admin_role_sessions, economy_setting_sessions, reschedule_sessions, ticket_reply_sessions, manual_balance_sessions, ai_sessions, casual_chat_history, promo_sticker_sessions, service_shop_setting_sessions, service_delivery_sessions, service_receipt_sessions, media_request_sessions, prompt_image_sessions, music_search_sessions, music_recognize_sessions, music_playlist_upload_sessions, music_search_cache, quick_quiz_recent, tts_sessions, short_sessions, summarize_sessions, instant_repost_sessions, repost_edit_sessions, scheduled_add_sessions, scheduled_edit_sessions, greeting_add_sessions, greeting_edit_sessions, anon_sessions]:
         collection.pop(user_id, None)
-    for collection in [broadcast_sessions, withdrawal_sessions, support_sessions, review_sessions, caption_sessions, channel_add_sessions, engagement_post_sessions, repost_sessions, schedule_time_sessions, repost_cta_sessions, promo_create_sessions, gift_redeem_sessions, mission_create_sessions, raffle_create_sessions, prediction_create_sessions, template_create_sessions, qr_sessions, daily_fal_channel_sessions, greeting_target_sessions, music_daily_target_sessions, music_daily_time_sessions, sticker_sessions, gif_sessions, reminder_sessions]:
+    for collection in [broadcast_sessions, withdrawal_sessions, support_sessions, review_sessions, caption_sessions, channel_add_sessions, engagement_post_sessions, repost_sessions, schedule_time_sessions, repost_cta_sessions, promo_create_sessions, gift_redeem_sessions, mission_create_sessions, raffle_create_sessions, prediction_create_sessions, template_create_sessions, qr_sessions, daily_fal_channel_sessions, greeting_target_sessions, music_daily_target_sessions, music_daily_time_sessions, sticker_sessions, gif_sessions, reminder_sessions, anon_reply_sessions]:
         collection.discard(user_id)
     cancel_album_buffers(user_id)
 
@@ -18936,6 +19289,8 @@ async def initialize_database():
         media_jobs_col.create_index([("user_id", 1), ("created_at", -1)]),
         media_jobs_col.create_index("expires_at", expireAfterSeconds=0),
         group_settings_col.create_index("_id"),
+        anon_messages_col.create_index([("sender_id", 1), ("created_at", -1)]),
+        anon_messages_col.create_index("created_at", expireAfterSeconds=60 * 60 * 24 * 30),
     )
 
 

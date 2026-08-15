@@ -34,6 +34,7 @@ os.environ.setdefault("AI_MODEL", "")
 import bot
 import vip_service
 import group_guard
+import anon_chat
 import instagram_comment_service as instagram_comments
 from ai_service import AIConfig, AIService, ProviderError
 from instagram_comment_service import (
@@ -2069,7 +2070,6 @@ class AsyncCoreTests(unittest.IsolatedAsyncioTestCase):
 
     def test_group_cleanup_config(self):
         """🧹 پاکسازی خودکار: مقادیر پیش‌فرض و فعال‌سازی."""
-        config = group_guard.get_group_config(12345)
         # چون async است با asyncio.run تست می‌کنیم
         import asyncio as _aio2
         class FakeCol:
@@ -2084,6 +2084,126 @@ class AsyncCoreTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(cfg["cleanup"]["enabled"])
             self.assertEqual(cfg["cleanup"]["after_minutes"], 60)
         _aio2.run(run())
+
+    # ==================== چت ناشناس 🎭 ====================
+
+    def test_anon_validate_alias(self):
+        """🎭 اعتبارسنجی اسم مستعار چت ناشناس."""
+        self.assertIsNone(anon_chat.validate_alias("شبح"))
+        self.assertIsNone(anon_chat.validate_alias("دوست مخفی"))
+        self.assertIsNone(anon_chat.validate_alias("Ali_Reza"))
+        self.assertIsNotNone(anon_chat.validate_alias(""))
+        self.assertIsNotNone(anon_chat.validate_alias("ا"))
+        self.assertIsNotNone(anon_chat.validate_alias("ا" * 30))
+        self.assertIsNotNone(anon_chat.validate_alias("<script>"))
+        self.assertIsNotNone(anon_chat.validate_alias("@شبح"))
+
+    def test_anon_parse_target(self):
+        """🎭 تشخیص نوع آیدی گیرنده: عددی یا @username."""
+        parsed = anon_chat.parse_target("123456789")
+        self.assertEqual(parsed, ("id", "123456789"))
+        parsed = anon_chat.parse_target("@Some_User")
+        self.assertEqual(parsed, ("username", "some_user"))
+        parsed = anon_chat.parse_target("  +98 912 123 45 67 ")
+        self.assertEqual(parsed[0], "id")
+        self.assertEqual(parsed[1], "989121234567")
+        self.assertIsNone(anon_chat.parse_target(""))
+        self.assertIsNone(anon_chat.parse_target("نه عدد نه یوزرنیم"))
+
+    def test_anon_token_and_limits(self):
+        """🎭 توکن یکتا و محدودیت‌های پیام ناشناس."""
+        t1 = anon_chat.make_token()
+        t2 = anon_chat.make_token()
+        self.assertNotEqual(t1, t2)
+        self.assertGreater(len(t1), 12)
+        self.assertEqual(anon_chat.TEXT_MAX, 1000)
+        self.assertEqual(anon_chat.DAILY_LIMIT, 10)
+
+    def test_anon_create_get_and_daily_count(self):
+        """🎭 ساخت، خواندن و شمارش روزانهٔ پیام ناشناس."""
+        import asyncio as _aio
+
+        class FakeCol:
+            def __init__(self):
+                self.store = {}
+            async def insert_one(self, doc):
+                self.store[doc["_id"]] = doc
+            async def find_one(self, q, *a, **k):
+                return self.store.get(q.get("_id"))
+            async def update_one(self, q, upd, **k):
+                tok = q.get("_id")
+                if tok in self.store:
+                    self.store[tok].update(upd["$set"])
+            async def count_documents(self, q, **k):
+                n = 0
+                for doc in self.store.values():
+                    if doc.get("sender_id") == q.get("sender_id") and doc.get("kind") != "reply":
+                        n += 1
+                return n
+
+        async def run():
+            anon_chat.anon_messages_col = FakeCol()
+            anon_chat.users_col = None
+            doc = await anon_chat.create_message(
+                sender_id=111,
+                sender_alias="شبح",
+                target_id=222,
+                text="سلام! این یک پیام ناشناس است 👻",
+            )
+            self.assertIsNotNone(doc)
+            self.assertTrue(doc["_id"].startswith("a"))
+            got = await anon_chat.get_message(doc["_id"])
+            self.assertEqual(got["sender_alias"], "شبح")
+            self.assertEqual(got["target_id"], 222)
+            self.assertFalse(got["read"])
+            await anon_chat.mark_read(doc["_id"])
+            got = await anon_chat.get_message(doc["_id"])
+            self.assertTrue(got["read"])
+            # پاسخ به عنوان kind=reply شمرده نمی‌شود
+            await anon_chat.create_message(111, "پاسخ ناشناس", 222, "جواب", reply_to=doc["_id"])
+            self.assertEqual(await anon_chat.daily_sent_count(111), 1)
+            self.assertEqual(await anon_chat.daily_sent_count(999), 0)
+
+        _aio.run(run())
+
+    def test_anon_resolve_target_db_first(self):
+        """🎭 پیدا کردن گیرنده با @username از دیتابیس."""
+        import asyncio as _aio
+
+        class FakeUsers:
+            async def find_one(self, q, *a, **k):
+                if q.get("username") == "sara":
+                    return {"_id": 777, "name": "سارا"}
+                return None
+
+        hits = []
+        async def hook(username):
+            hits.append(username)
+            return None
+
+        async def run():
+            anon_chat.users_col = FakeUsers()
+            anon_chat.resolve_username_hook = hook
+            target_id, display, err = await anon_chat.resolve_target_id("@sara")
+            self.assertEqual(target_id, 777)
+            self.assertEqual(display, "سارا")
+            self.assertIsNone(err)
+            self.assertEqual(hits, [])  # از دیتابیس پیدا شد؛ hook صدا زده نشد
+            # پیدا نشد → hook صدا زده می‌شود
+            target_id, display, err = await anon_chat.resolve_target_id("@ghayeb")
+            self.assertIsNone(target_id)
+            self.assertIsNotNone(err)
+            self.assertEqual(hits, ["ghayeb"])
+            # آیدی عددی مستقیم
+            target_id, display, err = await anon_chat.resolve_target_id("555")
+            self.assertEqual(target_id, 555)
+            self.assertIsNone(err)
+            # نامعتبر
+            target_id, display, err = await anon_chat.resolve_target_id("چیزی")
+            self.assertIsNone(target_id)
+            self.assertIsNotNone(err)
+
+        _aio.run(run())
 
 if __name__ == "__main__":
     unittest.main()

@@ -851,6 +851,7 @@ class CoreTests(unittest.TestCase):
             def __init__(self, **media):
                 self.photo = None
                 self.video = None
+                self.video_note = None
                 self.animation = None
                 self.document = None
                 self.audio = None
@@ -865,12 +866,15 @@ class CoreTests(unittest.TestCase):
 
         video = bot.extract_repost_payload(FakeMediaMessage(video=SimpleNamespace(file_id="v1")))
         audio = bot.extract_repost_payload(FakeMediaMessage(audio=SimpleNamespace(file_id="a1", title="Song", performer="Artist")))
+        vnote = bot.extract_repost_payload(FakeMediaMessage(video_note=SimpleNamespace(file_id="vn1")))
         text = FakeMediaMessage()
         text.caption = None
         text.text = "متن پست"
         text_payload = bot.extract_repost_payload(text)
         self.assertEqual(video["type"], "video")
         self.assertEqual(audio["type"], "audio")
+        self.assertEqual(vnote["type"], "video_note")
+        self.assertEqual(vnote["file_id"], "vn1")
         self.assertEqual(text_payload["type"], "text")
         self.assertNotIn("@SomeChannel", video["caption"])
 

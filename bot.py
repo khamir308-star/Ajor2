@@ -9040,13 +9040,16 @@ def build_branded_html(source_html: str) -> str:
 
 
 def extract_repost_payload(message: types.Message) -> dict | None:
-    if message.photo or message.video or message.animation or message.document or message.audio or message.voice:
+    if message.photo or message.video or message.video_note or message.animation or message.document or message.audio or message.voice:
         source_html = message_entity_html(message, 1024)
         caption = build_branded_html(source_html)
         if message.photo:
             return {"type": "photo", "file_id": message.photo[-1].file_id, "caption": caption, "parse_mode": "HTML"}
         if message.video:
             return {"type": "video", "file_id": message.video.file_id, "caption": caption, "parse_mode": "HTML"}
+        if message.video_note:
+            # ویدئو مسیج دایره‌ای — تلگرام برای آن کپشن پشتیبانی نمی‌کند
+            return {"type": "video_note", "file_id": message.video_note.file_id}
         if message.animation:
             return {"type": "animation", "file_id": message.animation.file_id, "caption": caption, "parse_mode": "HTML"}
         if message.audio:
@@ -9117,6 +9120,8 @@ async def send_repost_payload(chat_id: int, payload: dict, reply_markup=None):
         )
     if kind == "voice":
         return await bot.send_voice(chat_id, payload["file_id"], caption=payload.get("caption"), parse_mode=parse_mode, reply_markup=reply_markup)
+    if kind == "video_note":
+        return await bot.send_video_note(chat_id, payload["file_id"], reply_markup=reply_markup)
     if kind == "sticker":
         return await bot.send_sticker(chat_id, payload["file_id"], reply_markup=reply_markup)
     if kind == "document":

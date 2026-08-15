@@ -7915,6 +7915,105 @@ def _anon_delivery_keyboard(link: str) -> InlineKeyboardMarkup:
     ])
 
 
+# برچسب فارسی انواع رسانهٔ چت ناشناس
+ANON_MEDIA_LABELS: dict[str, str] = {
+    "photo": "📸 عکس",
+    "voice": "🎙 ویس",
+    "video": "🎬 ویدئو",
+    "animation": "🎞 گیف",
+    "video_note": "🔵 ویدئو گرد",
+    "audio": "🎵 فایل صوتی",
+    "document": "📄 فایل",
+    "sticker": "🎭 استیکر",
+}
+
+
+def _anon_media_label(doc: dict) -> str:
+    return ANON_MEDIA_LABELS.get(doc.get("media_type"), "💬 پیام متنی")
+
+
+async def _anon_finish_send(message: types.Message, doc: dict, target_name: str, alias: str):
+    """پایان ارسال پیام ناشناس (متن یا رسانه): لینک، DM به گیرنده و تأیید برای فرستنده."""
+    link = await _anon_link(doc["_id"])
+    media_label = _anon_media_label(doc)
+    target_id = int(doc.get("target_id") or 0)
+    # تلاش برای ارسال مستقیم لینک به گیرنده
+    delivered = False
+    try:
+        await bot.send_message(
+            target_id,
+            f"👻 <b>پیام ناشناس داری!</b>\n\n"
+            f"یکی با اسم مستعار «{html.escape(alias)}» برات {media_label} فرستاده.\n"
+            "برای دیدنش روی دکمهٔ زیر بزن:",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📩 دیدن پیام ناشناس", url=link)],
+            ]),
+        )
+        delivered = True
+        await anon_chat.mark_delivered(doc["_id"])
+    except (TelegramForbiddenError, TelegramBadRequest):
+        delivered = False
+    except Exception as exc:
+        log.warning("anon deliver failed: %s", exc)
+        delivered = False
+
+    delivery_note = (
+        "📨 لینک هم مستقیم برای گیرنده ارسال شد."
+        if delivered
+        else "⚠️ گیرنده هنوز ربات رو استارت نکرده، پس لینک مستقیم براش ارسال نشد.\n"
+             "می‌تونی خودت لینک رو براش بفرستی، یا صبر کن استارت کنه و بعد دوباره امتحان کنی."
+    )
+    return await message.answer(
+        f"✅ <b>پیام ناشناس فرستاده شد!</b> 🎉\n\n"
+        f"{media_label} · 👤 گیرنده: <b>{html.escape(target_name)}</b>\n"
+        f"🎭 اسم مستعار: <b>{html.escape(alias)}</b>\n\n"
+        f"🔗 <b>لینک پیام:</b>\n<code>{link}</code>\n\n"
+        f"{delivery_note}\n\n"
+        "📌 هر کسی لینک رو داشته باشه می‌تونه پیام رو بخونه و ناشناس جواب بده.",
+        parse_mode="HTML",
+        reply_markup=_anon_delivery_keyboard(link),
+    )
+
+
+async def _anon_finish_reply(message: types.Message, reply_doc: dict, original: dict):
+    """پایان پاسخ ناشناس (متن یا رسانه): لینک، DM به فرستندهٔ اصلی و تأیید."""
+    link = await _anon_link(reply_doc["_id"])
+    media_label = _anon_media_label(reply_doc)
+    # اطلاع به فرستندهٔ اصلی پیام
+    delivered = False
+    try:
+        await bot.send_message(
+            original["sender_id"],
+            "💬 <b>جواب پیام ناشناس اومده!</b>\n\n"
+            f"به پیام ناشناس قبلی‌ات {media_label} جواب داده‌اند.\n"
+            "برای دیدنش روی دکمهٔ زیر بزن:",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📩 دیدن جواب", url=link)],
+            ]),
+        )
+        delivered = True
+        await anon_chat.mark_delivered(reply_doc["_id"])
+    except (TelegramForbiddenError, TelegramBadRequest):
+        delivered = False
+    except Exception as exc:
+        log.warning("anon reply deliver failed: %s", exc)
+        delivered = False
+
+    if delivered:
+        note = "✅ جوابت مستقیم برای فرستندهٔ اصلی ارسال شد."
+    else:
+        note = f"🔗 لینک جوابت (فرستندهٔ اصلی ربات رو استارت نکرده، خودت بفرستش):\n<code>{link}</code>"
+    return await message.answer(
+        f"💬 <b>پاسخ ناشناس ارسال شد!</b>\n\n"
+        f"{note}\n\n"
+        "🤫 هویتت هیچ‌جا فاش نشد؛ گیرنده فقط «پاسخ ناشناس» رو می‌بینه.",
+        parse_mode="HTML",
+        reply_markup=chat_reply_menu(message.from_user.id),
+    )
+
+
 async def start_anon_chat(message: types.Message):
     user_id = message.from_user.id
     if user_id in anon_sessions or user_id in anon_reply_sessions:
@@ -7989,8 +8088,9 @@ async def handle_anon_step_text(message: types.Message):
         session["step"] = "msg"
         return await message.answer(
             f"✅ گیرنده: <b>{html.escape(session['target_name'])}</b> 🎯\n\n"
-            "<b>قدم ۳ از ۳:</b> حالا <b>متن پیامت</b> رو بنویس "
-            f"(فقط متن، تا {anon_chat.TEXT_MAX} کاراکتر).\n"
+            "<b>قدم ۳ از ۳:</b> حالا <b>پیامت</b> رو بفرست:\n"
+            "✍️ <b>متن</b> (تا ۱۰۰۰ کاراکتر) · 📸 <b>عکس</b> · 🎙 <b>ویس</b> · 🎬 <b>ویدئو</b> · 🎞 گیف و حتی استیکر!\n"
+            "💬 اگه رسانه می‌فرستی، می‌تونی متن کوتاهی هم توی کپشنش بنویسی.\n"
             "پیامت با لینک اختصاصی به گیرنده می‌رسه و هویتت مخفی می‌مونه 🤫\n"
             "/cancel برای انصراف",
             parse_mode="HTML",
@@ -8000,7 +8100,7 @@ async def handle_anon_step_text(message: types.Message):
     if step == "msg":
         if not text:
             return await message.answer(
-                "❌ پیام خالی بود؛ متن پیامت رو بنویس یا /cancel.",
+                "❌ پیام خالی بود؛ متن پیامت رو بنویس، یا عکس/ویس/ویدئو بفرست یا /cancel.",
                 reply_markup=chat_reply_menu(user_id),
             )
         if len(text) > anon_chat.TEXT_MAX:
@@ -8019,49 +8119,70 @@ async def handle_anon_step_text(message: types.Message):
                 "❌ ذخیرهٔ پیام ناموفق بود؛ چند لحظه بعد دوباره تلاش کن.",
                 reply_markup=chat_reply_menu(user_id),
             )
-        link = await _anon_link(doc["_id"])
-
-        # تلاش برای ارسال مستقیم لینک به گیرنده
-        delivered = False
-        try:
-            await bot.send_message(
-                target_id,
-                f"👻 <b>پیام ناشناس داری!</b>\n\n"
-                f"یکی با اسم مستعار «{html.escape(alias)}» برات پیام فرستاده.\n"
-                "برای خوندنش روی دکمهٔ زیر بزن:",
-                parse_mode="HTML",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="📩 دیدن پیام ناشناس", url=link)],
-                ]),
-            )
-            delivered = True
-            await anon_chat.mark_delivered(doc["_id"])
-        except (TelegramForbiddenError, TelegramBadRequest):
-            delivered = False
-        except Exception as exc:
-            log.warning("anon deliver failed: %s", exc)
-            delivered = False
-
-        delivery_note = (
-            "📨 لینک هم مستقیم برای گیرنده ارسال شد."
-            if delivered
-            else "⚠️ گیرنده هنوز ربات رو استارت نکرده، پس لینک مستقیم براش ارسال نشد.\n"
-                 "می‌تونی خودت لینک رو براش بفرستی، یا صبر کن استارت کنه و بعد دوباره امتحان کنی."
-        )
-        return await message.answer(
-            "✅ <b>پیام ناشناس فرستاده شد!</b> 🎉\n\n"
-            f"👤 گیرنده: <b>{html.escape(target_name)}</b>\n"
-            f"🎭 اسم مستعار: <b>{html.escape(alias)}</b>\n\n"
-            f"🔗 <b>لینک پیام:</b>\n<code>{link}</code>\n\n"
-            f"{delivery_note}\n\n"
-            "📌 هر کسی لینک رو داشته باشه می‌تونه پیام رو بخونه و ناشناس جواب بده.",
-            parse_mode="HTML",
-            reply_markup=_anon_delivery_keyboard(link),
-        )
+        return await _anon_finish_send(message, doc, target_name, alias)
 
     # مرحلهٔ ناشناخته — ریست
     anon_sessions.pop(user_id, None)
     return None
+
+
+async def handle_anon_step_media(message: types.Message, media_type: str, file_id: str):
+    """دریافت رسانه (عکس/ویس/ویدئو/گیف/...) در مرحلهٔ پیام چت ناشناس."""
+    user_id = message.from_user.id
+    session = anon_sessions.get(user_id)
+    if not session:
+        return None
+    if session.get("step") != "msg":
+        return await message.answer(
+            "❌ الان منتظر <b>متن</b> هستم (اسم مستعار یا آیدی گیرنده).\n"
+            "اول مراحل رو با متن کامل کن یا /cancel بزن.",
+            parse_mode="HTML",
+            reply_markup=chat_reply_menu(user_id),
+        )
+    alias = session.get("alias") or "ناشناس"
+    target_id = int(session.get("target_id") or 0)
+    target_name = session.get("target_name") or str(target_id)
+    caption = (message.caption or "").strip()[:anon_chat.TEXT_MAX]
+    anon_sessions.pop(user_id, None)
+
+    doc = await anon_chat.create_message(
+        user_id, alias, target_id, caption,
+        media_type=media_type, media_file_id=file_id,
+    )
+    if not doc:
+        return await message.answer(
+            "❌ ذخیرهٔ پیام ناموفق بود؛ چند لحظه بعد دوباره تلاش کن.",
+            reply_markup=chat_reply_menu(user_id),
+        )
+    return await _anon_finish_send(message, doc, target_name, alias)
+
+
+async def handle_anon_reply_media(message: types.Message, media_type: str, file_id: str):
+    """دریافت رسانه به‌عنوان پاسخ ناشناس."""
+    user_id = message.from_user.id
+    token = anon_reply_sessions.get(user_id)
+    if not token:
+        return None
+    original = await anon_chat.get_message(token)
+    if not original:
+        anon_reply_sessions.pop(user_id, None)
+        return await message.answer(
+            "❌ پیام اصلی پیدا نشد یا منقضی شده بود.",
+            reply_markup=chat_reply_menu(user_id),
+        )
+    anon_reply_sessions.pop(user_id, None)
+    caption = (message.caption or "").strip()[:anon_chat.TEXT_MAX]
+    reply_doc = await anon_chat.create_message(
+        user_id, "پاسخ ناشناس", original["sender_id"], caption,
+        reply_to=original["_id"],
+        media_type=media_type, media_file_id=file_id,
+    )
+    if not reply_doc:
+        return await message.answer(
+            "❌ ذخیرهٔ پاسخ ناموفق بود؛ چند لحظه بعد دوباره تلاش کن.",
+            reply_markup=chat_reply_menu(user_id),
+        )
+    return await _anon_finish_reply(message, reply_doc, original)
 
 
 async def handle_anon_reply_text(message: types.Message):
@@ -8105,44 +8226,11 @@ async def handle_anon_reply_text(message: types.Message):
             "❌ ذخیرهٔ پاسخ ناموفق بود؛ چند لحظه بعد دوباره تلاش کن.",
             reply_markup=chat_reply_menu(user_id),
         )
-    link = await _anon_link(reply_doc["_id"])
-
-    # اطلاع به فرستندهٔ اصلی پیام
-    delivered = False
-    try:
-        await bot.send_message(
-            original["sender_id"],
-            "💬 <b>جواب پیام ناشناس اومده!</b>\n\n"
-            "به پیام ناشناس قبلی‌ات که با لینک فرستاده بودی، جواب داده‌اند.\n"
-            "برای خوندنش روی دکمهٔ زیر بزن:",
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="📩 دیدن جواب", url=link)],
-            ]),
-        )
-        delivered = True
-        await anon_chat.mark_delivered(reply_doc["_id"])
-    except (TelegramForbiddenError, TelegramBadRequest):
-        delivered = False
-    except Exception as exc:
-        log.warning("anon reply deliver failed: %s", exc)
-        delivered = False
-
-    if delivered:
-        note = "✅ جوابت مستقیم برای فرستندهٔ اصلی ارسال شد."
-    else:
-        note = f"🔗 لینک جوابت (فرستندهٔ اصلی ربات رو استارت نکرده، خودت بفرستش):\n<code>{link}</code>"
-    return await message.answer(
-        "💬 <b>پاسخ ناشناس ارسال شد!</b>\n\n"
-        f"{note}\n\n"
-        "🤫 هویتت هیچ‌جا فاش نشد؛ گیرنده فقط «پاسخ ناشناس» رو می‌بینه.",
-        parse_mode="HTML",
-        reply_markup=chat_reply_menu(user_id),
-    )
+    return await _anon_finish_reply(message, reply_doc, original)
 
 
 async def show_anon_message(message: types.Message, token: str):
-    """نمایش پیام ناشناس برای گیرنده (از طریق لینک اختصاصی)."""
+    """نمایش پیام ناشناس برای گیرنده (از طریق لینک اختصاصی) — متن یا رسانه."""
     user_id = message.from_user.id
     doc = await anon_chat.get_message(token)
     if not doc:
@@ -8153,16 +8241,37 @@ async def show_anon_message(message: types.Message, token: str):
     await anon_chat.mark_read(token)
     created = doc.get("created_at")
     created_text = format_tehran_datetime(created) if created else ""
-    text = (
-        "👻 <b>پیام ناشناس</b>\n\n"
-        f"🎭 از طرف: «{html.escape(doc.get('sender_alias') or 'ناشناس')}»\n"
-        f"📅 {created_text}\n\n"
-        f"{html.escape(doc.get('text') or '')}"
-    )
+    alias = html.escape(doc.get("sender_alias") or "ناشناس")
+    body = html.escape(doc.get("text") or "")
+    header = f"👻 <b>پیام ناشناس</b>\n\n🎭 از طرف: «{alias}»\n📅 {created_text}"
+    if body:
+        header += f"\n\n{body}"
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💬 پاسخ ناشناس بده", callback_data=f"anon_reply:{token}")],
     ])
-    return await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+    media_type = doc.get("media_type")
+    file_id = doc.get("media_file_id")
+    if media_type == "photo" and file_id:
+        return await message.answer_photo(file_id, caption=header, parse_mode="HTML", reply_markup=keyboard)
+    if media_type == "voice" and file_id:
+        return await message.answer_voice(file_id, caption=header, parse_mode="HTML", reply_markup=keyboard)
+    if media_type == "video" and file_id:
+        return await message.answer_video(file_id, caption=header, parse_mode="HTML", reply_markup=keyboard)
+    if media_type == "animation" and file_id:
+        return await message.answer_animation(file_id, caption=header, parse_mode="HTML", reply_markup=keyboard)
+    if media_type == "audio" and file_id:
+        return await message.answer_audio(file_id, caption=header, parse_mode="HTML", reply_markup=keyboard)
+    if media_type == "document" and file_id:
+        return await message.answer_document(file_id, caption=header, parse_mode="HTML", reply_markup=keyboard)
+    if media_type == "video_note" and file_id:
+        if body:
+            await message.answer(header, parse_mode="HTML")
+        return await message.answer_video_note(file_id, reply_markup=keyboard)
+    if media_type == "sticker" and file_id:
+        if body:
+            await message.answer(header, parse_mode="HTML")
+        return await message.answer_sticker(file_id, reply_markup=keyboard)
+    return await message.answer(header, parse_mode="HTML", reply_markup=keyboard)
 
 
 @dp.callback_query(F.data.startswith("anon_reply:"))
@@ -14320,6 +14429,15 @@ async def publish_group_callback(callback: types.CallbackQuery):
 @dp.message(F.sticker)
 async def handle_promo_sticker(message: types.Message):
     user_id = message.from_user.id
+    # --- چت ناشناس: استیکر در مرحلهٔ پیام یا پاسخ ناشناس ---
+    if user_id in anon_reply_sessions:
+        result = await handle_anon_reply_media(message, "sticker", message.sticker.file_id)
+        if result is not None:
+            return
+    if user_id in anon_sessions:
+        result = await handle_anon_step_media(message, "sticker", message.sticker.file_id)
+        if result is not None:
+            return
     config = promo_sticker_sessions.get(user_id)
     if not config or not is_admin(user_id):
         if is_admin(user_id):
@@ -14555,6 +14673,15 @@ async def handle_video_round_request(message: types.Message) -> None:
 
 @dp.message(F.photo)
 async def handle_admin_receipt_photo(message: types.Message):
+    # --- چت ناشناس: عکس در مرحلهٔ پیام یا پاسخ ناشناس ---
+    if message.from_user.id in anon_reply_sessions:
+        result = await handle_anon_reply_media(message, "photo", message.photo[-1].file_id)
+        if result is not None:
+            return
+    if message.from_user.id in anon_sessions:
+        result = await handle_anon_step_media(message, "photo", message.photo[-1].file_id)
+        if result is not None:
+            return
     # --- رسید پرداخت اشتراک پرمیوم ---
     if message.from_user.id in vip_receipt_sessions:
         vip_receipt_sessions.discard(message.from_user.id)
@@ -14728,8 +14855,66 @@ async def handle_admin_receipt_photo(message: types.Message):
     updated = await groups_col.find_one({"group_uuid": group_uuid})
     await message.answer(f"✅ عکس اضافه شد.\nتعداد فایل‌ها: {updated['file_count']}")
 
+@dp.message(F.voice)
+async def handle_anon_voice(message: types.Message):
+    """ویس در چت ناشناس (مرحلهٔ پیام یا پاسخ)."""
+    if message.from_user.id in anon_reply_sessions:
+        result = await handle_anon_reply_media(message, "voice", message.voice.file_id)
+        if result is not None:
+            return
+    if message.from_user.id in anon_sessions:
+        result = await handle_anon_step_media(message, "voice", message.voice.file_id)
+        if result is not None:
+            return
+
+
+@dp.message(F.video_note)
+async def handle_anon_video_note(message: types.Message):
+    """ویدئو گرد در چت ناشناس (مرحلهٔ پیام یا پاسخ)."""
+    if message.from_user.id in anon_reply_sessions:
+        result = await handle_anon_reply_media(message, "video_note", message.video_note.file_id)
+        if result is not None:
+            return
+    if message.from_user.id in anon_sessions:
+        result = await handle_anon_step_media(message, "video_note", message.video_note.file_id)
+        if result is not None:
+            return
+
+
+@dp.message(F.audio)
+async def handle_anon_audio(message: types.Message):
+    """فایل صوتی در چت ناشناس (مرحلهٔ پیام یا پاسخ)."""
+    if message.from_user.id in anon_reply_sessions:
+        result = await handle_anon_reply_media(message, "audio", message.audio.file_id)
+        if result is not None:
+            return
+    if message.from_user.id in anon_sessions:
+        result = await handle_anon_step_media(message, "audio", message.audio.file_id)
+        if result is not None:
+            return
+
+
 @dp.message(F.document | F.video)
 async def handle_file_upload(message: types.Message):
+    # --- چت ناشناس: ویدئو/فایل در مرحلهٔ پیام یا پاسخ ناشناس ---
+    if message.from_user.id in anon_reply_sessions:
+        media = message.video or message.document
+        result = await handle_anon_reply_media(
+            message,
+            "video" if message.video else "document",
+            media.file_id,
+        )
+        if result is not None:
+            return
+    if message.from_user.id in anon_sessions:
+        media = message.video or message.document
+        result = await handle_anon_step_media(
+            message,
+            "video" if message.video else "document",
+            media.file_id,
+        )
+        if result is not None:
+            return
     delivery_order_id = service_delivery_sessions.get(message.from_user.id)
     if delivery_order_id and is_admin(message.from_user.id):
         if not message.document:
@@ -14843,6 +15028,15 @@ async def handle_file_upload(message: types.Message):
 
 @dp.message(F.animation)
 async def handle_admin_animation(message: types.Message):
+    # --- چت ناشناس: گیف در مرحلهٔ پیام یا پاسخ ناشناس ---
+    if message.from_user.id in anon_reply_sessions:
+        result = await handle_anon_reply_media(message, "animation", message.animation.file_id)
+        if result is not None:
+            return
+    if message.from_user.id in anon_sessions:
+        result = await handle_anon_step_media(message, "animation", message.animation.file_id)
+        if result is not None:
+            return
     config = promo_sticker_sessions.get(message.from_user.id)
     if config and is_admin(message.from_user.id):
         if not config["rewards"].get("gif"):

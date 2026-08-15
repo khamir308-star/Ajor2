@@ -134,8 +134,15 @@ async def create_message(
     target_id: int,
     text: str,
     reply_to: str | None = None,
+    media_type: str | None = None,
+    media_file_id: str | None = None,
 ) -> dict[str, Any] | None:
-    """ساخت و ذخیرهٔ پیام ناشناس؛ در صورت موفقیت سند کامل برمی‌گرداند."""
+    """ساخت و ذخیرهٔ پیام ناشناس؛ در صورت موفقیت سند کامل برمی‌گرداند.
+
+    رسانه‌های پشتیبانی‌شده (media_type): photo, voice, video, animation,
+    video_note, audio, document, sticker — file_id در media_file_id ذخیره می‌شود
+    و متن/کپشن کاربر در text.
+    """
     if anon_messages_col is None:
         return None
     token = make_token()
@@ -145,7 +152,9 @@ async def create_message(
         "sender_id": sender_id,
         "sender_alias": sender_alias[:ALIAS_MAX],
         "target_id": target_id,
-        "text": text[:TEXT_MAX],
+        "text": (text or "")[:TEXT_MAX],
+        "media_type": media_type,
+        "media_file_id": media_file_id,
         "reply_to": reply_to,
         "created_at": now_utc(),
         "read": False,

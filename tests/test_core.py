@@ -2163,6 +2163,16 @@ class AsyncCoreTests(unittest.IsolatedAsyncioTestCase):
             await anon_chat.create_message(111, "پاسخ ناشناس", 222, "جواب", reply_to=doc["_id"])
             self.assertEqual(await anon_chat.daily_sent_count(111), 1)
             self.assertEqual(await anon_chat.daily_sent_count(999), 0)
+            # پیام رسانه‌ای (عکس/ویس) با file_id ذخیره می‌شود
+            media_doc = await anon_chat.create_message(
+                111, "شبح", 222, "یه عکس ببین 👀",
+                media_type="photo", media_file_id="AgAC_FAKE_123",
+            )
+            self.assertEqual(media_doc["media_type"], "photo")
+            self.assertEqual(media_doc["media_file_id"], "AgAC_FAKE_123")
+            got_media = await anon_chat.get_message(media_doc["_id"])
+            self.assertEqual(got_media["media_type"], "photo")
+            self.assertEqual(got_media["text"], "یه عکس ببین 👀")
 
         _aio.run(run())
 

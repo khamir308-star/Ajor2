@@ -19032,82 +19032,28 @@ async def configure_telegram_profile():
 
 
 async def configure_telegram_ui():
-    await configure_telegram_profile()
-    user_commands = [
-        BotCommand(command="start", description="شروع آجُرپاره و فعال‌کردن منوی فارسی"),
-        BotCommand(command="menu", description="نمایش منوی کامل ابزارها و خدمات"),
-        BotCommand(command="app", description="بازکردن Mini App بازی و ابزارها"),
-        BotCommand(command="ai", description="هوش مصنوعی فارسی؛ چت، متن و تصویر"),
-        BotCommand(command="voice", description="تبدیل ویس و فایل صوتی به متن"),
-        BotCommand(command="download", description="دانلود محتوای عمومی شبکه‌های اجتماعی"),
-        BotCommand(command="igcomment", description="کپی متن کامنت عمومی اینستاگرام از روی لینک"),
-        BotCommand(command="uploadurl", description="ارسال فایل مستقیم از URL به تلگرام"),
-        BotCommand(command="checklink", description="بررسی ساختار و نشانه‌های مشکوک لینک"),
-        BotCommand(command="remind", description="ساخت یادآور شخصی؛ زمان | متن"),
-        BotCommand(command="reminders", description="نمایش یادآورهای فعال من"),
-        BotCommand(command="games", description="بازی‌ها، چالش‌ها و جایزه‌ها"),
-        BotCommand(command="qr", description="ساخت QR از متن یا لینک"),
-        BotCommand(command="sticker", description="ساخت استیکر و پک اختصاصی تلگرام"),
-        BotCommand(command="gif", description="ساخت GIF تلگرامی از عکس یا ویدئو"),
-        BotCommand(command="caption", description="ساخت کپشن جذاب و هشتگ"),
-        BotCommand(command="truth", description="بازی جرأت یا حقیقت"),
-        BotCommand(command="emoji_api", description="راهنمای API شکلک‌های سفارشی"),
-        BotCommand(command="weather", description="آب‌وهوای شهرها (فارسی/انگلیسی)"),
-        BotCommand(command="rate", description="نرخ ارز؛ مثال: /rate usd eur"),
-        BotCommand(command="crypto", description="قیمت ارز دیجیتال؛ مثال: /crypto btc"),
-        BotCommand(command="wiki", description="خلاصه ویکی‌پدیا؛ مثال: /wiki نوروز"),
-        BotCommand(command="book", description="جستجوی کتاب؛ مثال: /book بوف کور"),
-        BotCommand(command="country", description="اطلاعات کشور؛ مثال: /country ایران"),
-        BotCommand(command="time", description="ساعت جهانی؛ مثال: /time تهران"),
-        BotCommand(command="checkpass", description="بررسی امنیت رمز عبور"),
-        BotCommand(command="quiz", description="کوئیز جهانی Open Trivia"),
-        BotCommand(command="calendar", description="تقویم شمسی با مناسبت‌ها"),
-        BotCommand(command="tts", description="تبدیل متن به صدا؛ مثال: /tts سلام"),
-        BotCommand(command="ttsvoice", description="انتخاب صدای زن یا مرد"),
-        BotCommand(command="mystats", description="آمار شخصی تو در ربات"),
-        BotCommand(command="short", description="کوتاه‌کردن لینک"),
-        BotCommand(command="summarize", description="خلاصه‌سازی متن با هوش مصنوعی"),
-        BotCommand(command="pray", description="اوقات شرعی؛ مثال: /pray تهران"),
-        BotCommand(command="fal", description="فال حافظ"),
-        BotCommand(command="falsub", description="فال روزانه صبحگاهی (اشتراک)"),
-        BotCommand(command="praysub", description="اذان‌گوی شخصی (اشتراک)"),
-        BotCommand(command="song", description="جستجو و دانلود آهنگ"),
-        BotCommand(command="profile", description="امتیاز، رتبه، سکه و استریک من"),
-        BotCommand(command="joke", description="دریافت یک جوک باحال"),
-        BotCommand(command="quote", description="دریافت جمله انگیزشی"),
-        BotCommand(command="help", description="راهنمای ربات و ارتباط با پشتیبانی"),
-        BotCommand(command="cancel", description="لغو عملیات فعال"),
-    ]
-    await bot.set_my_commands(user_commands, scope=BotCommandScopeAllPrivateChats())
-    await bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())
-    await install_group_commands()
-    # محدوده اختصاصی هر گروه، تنظیمات قدیمی یا کش تلگرام را هم بازنویسی می‌کند.
-    managed_groups = await managed_chats_col.find({"type": {"$in": ["group", "supergroup"]}, "status": {"$in": ["administrator", "creator", "member", "active"]}}, {"_id": 1}).limit(100).to_list(length=100)
-    for managed in managed_groups:
-        try:
-            await install_group_commands(managed["_id"])
-        except (TelegramBadRequest, TelegramForbiddenError) as exc:
-            log.warning("ثبت دستورات گروه %s ممکن نشد: %s", managed["_id"], exc)
-    admin_commands = user_commands + [
-        BotCommand(command="admin", description="پنل مدیریت حرفه‌ای"),
-        BotCommand(command="channels", description="مدیریت کانال‌های اجباری"),
-        BotCommand(command="repost", description="بازنشر گروهی و برندینگ"),
-        BotCommand(command="quickpost", description="انتشار فوری بدون تأیید"),
-        BotCommand(command="configs", description="لیست و حذف پروکسی/کانفیگ"),
-        BotCommand(command="search", description="جستجوی کاربر"),
-        BotCommand(command="activity", description="فعالیت کاربر با آیدی"),
-        BotCommand(command="ban", description="مسدودکردن کاربر"),
-        BotCommand(command="unban", description="رفع مسدودی کاربر"),
-        BotCommand(command="ping", description="بررسی سلامت ربات"),
-    ]
-    for admin_id in set(ADMIN_IDS) | set(delegated_admins_cache):
-        try:
-            await bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
-        except TelegramBadRequest as exc:
-            # اگر ادمین هنوز /start نزده باشد، تلگرام scope اختصاصی را رد می‌کند.
-            log.warning("ثبت منوی ادمین %s ممکن نشد: %s", admin_id, exc)
-    # آیکون Mini App پایین چت حفظ می‌شود؛ منوی بزرگ دکمه‌ای توسط ReplyKeyboardMarkup داخل چت نمایش داده می‌شود.
-    await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text="🎮 بازی کن", web_app=WebAppInfo(url=MINI_APP_URL)))
+    # تلگرام بعد از ری‌استارت‌های مکرر Flood control می‌دهد؛ تنظیم UI اختیاری است
+    # و نباید ربات را کرش کند — در ری‌استارت بعدی دوباره امتحان می‌شود.
+    try:
+        await configure_telegram_profile()
+        user_commands = [
+            BotCommand(command="start", description="شروع آجُرپاره و فعال‌کردن منوی فارسی"),
+            BotCommand(command="menu", description="نمایش منوی کامل ابزارها و خدمات"),
+            BotCommand(command="app", description="بازکردن Mini App بازی و ابزارها"),
+            BotCommand(command="ai", description="هوش مصنوعی فارسی؛ چت، متن و تصویر"),
+            BotCommand(command="voice", description="تبدیل ویس و فایل صوتی به متن"),
+            BotCommand(command="download", description="دانلود محتوای عمومی شبکه‌های اجتماعی"),
+            BotCommand(command="uploadurl", description="ارسال فایل مستقیم از URL به تلگرام"),
+            BotCommand(command="remind", description="ساخت یادآور شخصی"),
+            BotCommand(command="games", description="بازی‌ها و سرگرمی"),
+            BotCommand(command="vip", description="👑 اشتراک پرمیوم"),
+            BotCommand(command="help", description="راهنمای ربات"),
+        ]
+        await bot.set_my_commands(user_commands, scope=BotCommandScopeAllPrivateChats())
+        await bot.set_my_commands(user_commands, scope=BotCommandScopeDefault())
+        await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text="🎮 بازی کن", web_app=WebAppInfo(url=MINI_APP_URL)))
+    except Exception as exc:
+        log.warning("تنظیم UI تلگرام با خطا انجام نشد (Flood/شبکه): %s", exc)
 
 
 def clean_feed_text(value: str | None, limit: int = 240) -> str:

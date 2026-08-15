@@ -1328,7 +1328,7 @@ REPLY_BUTTON_LABELS: set[str] = {
     # منوی اصلی
     "🎮 بازی‌ها", "🎁 جوایز و کیف پول", "📰 اخبار و ترندها", "🧰 ابزارهای ربات",
     "📱 QR ساز", "🎨 گیف و استیکرساز", "🤖 هوش مصنوعی", "🛍 سرویس اختصاصی",
-    "💬 پشتیبانی", "⚙️ پنل مدیریت", "🎭 چت ناشناس",
+    "💬 پشتیبانی", "⚙️ پنل مدیریت", "🎭 چت ناشناس", "🛡 پنل مدیریت گروه",
     # منوی بازی‌ها
     "🏃 بزن در رو", "🧠 کوئیز فوری", "🎲 تاس", "🎯 دارت",
     "🪨 سنگ‌کاغذ‌قیچی", "🪙 شیر یا خط", "🔢 حدس عدد", "🎭 جرأت یا حقیقت",
@@ -2792,6 +2792,7 @@ def chat_reply_menu(user_id: int | None = None) -> ReplyKeyboardMarkup:
         [KeyboardButton(text="🎨 گیف و استیکرساز")],
         [KeyboardButton(text="🤖 هوش مصنوعی"), KeyboardButton(text="🛍 سرویس اختصاصی")],
         [KeyboardButton(text="🎭 چت ناشناس"), KeyboardButton(text="💬 پشتیبانی")],
+        [KeyboardButton(text="🛡 پنل مدیریت گروه")],
     ]
     if user_id is not None and is_admin(user_id):
         rows.append([KeyboardButton(text="⚙️ پنل مدیریت")])
@@ -18353,6 +18354,16 @@ async def handle_text(message: types.Message):
         return await message.answer("💬 منوی پشتیبانی باز شد:", reply_markup=support_reply_menu())
     if text == "🎭 چت ناشناس":
         return await start_anon_chat(message)
+    if text == "🛡 پنل مدیریت گروه":
+        return await message.answer(
+            "🛡 <b>مرکز مدیریت گروه</b>\n\n"
+            "همه‌چیز برای مدیریت گروه‌هات اینجاست 👇\n"
+            "• اول <b>پنل آزمایشی</b> رو ببین و همه قابلیت‌ها رو امتحان کن\n"
+            "• با <b>اشتراک پرمیوم</b> قفل‌ها، ضد اسپم و خاموشی برای گروه واقعی‌ات فعال می‌شه\n"
+            "• تبلیغ کانالت، تیکت و پشتیبانی هم از همین‌جا 👇",
+            parse_mode="HTML",
+            reply_markup=group_center_menu(user_id),
+        )
     if text == "📖 معرفی ربات":
         return await message.answer(about_bot_text(), reply_markup=support_reply_menu(), parse_mode="HTML")
     if text == "⚙️ پنل مدیریت":

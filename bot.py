@@ -20907,6 +20907,8 @@ async def main():
         app.router.add_get("/api/leaderboard", miniapp_leaderboard_api)
         app.router.add_get("/app", miniapp_redirect)
         app.router.add_get("/app/", miniapp_index)
+        app.router.add_get("/panel", group_panel_page)
+        app.router.add_get("/panel/", group_panel_page)
         app.router.add_static("/app/", str(WEBAPP_DIR), show_index=False)
         if USE_WEBHOOK:
             app.router.add_post(WEBHOOK_PATH, telegram_webhook)

@@ -32,6 +32,8 @@ os.environ.setdefault("OPENROUTER_API_KEY", "")
 os.environ.setdefault("AI_MODEL", "")
 
 import bot
+import vip_service
+import group_guard
 import instagram_comment_service as instagram_comments
 from ai_service import AIConfig, AIService, ProviderError
 from instagram_comment_service import (
@@ -1981,6 +1983,54 @@ class AsyncCoreTests(unittest.IsolatedAsyncioTestCase):
         r1, r2 = asyncio.run(run())
         self.assertTrue(r1)
         self.assertTrue(r2)
+
+    def test_vip_plan_selection(self):
+        """👑 انتخاب پلن اشتراک پرمیوم."""
+        self.assertEqual(len(vip_service.VIP_PLANS), 4)
+        plan = vip_service.plan_by_months(3)
+        self.assertEqual(plan["price"], 239_000)
+        self.assertIsNone(vip_service.plan_by_months(0))
+
+    def test_vip_extend_and_remaining(self):
+        """👑 تمدید اشتراک و محاسبهٔ روزهای باقی‌مانده."""
+        import asyncio as _aio
+        user_id = 998877
+
+        async def run():
+            class FakeCol:
+                def __init__(self):
+                    self.doc = {}
+                async def find_one(self, q, *a, **k):
+                    return self.doc
+                async def update_one(self, q, upd, **k):
+                    self.doc = upd.get("$set", self.doc)
+                    return SimpleNamespace(modified_count=1, upserted_id=None)
+            vip_service.users_col = FakeCol()
+            exp = await vip_service.extend_vip(user_id, 1)
+            self.assertIsNotNone(exp)
+            days = vip_service.vip_remaining_days({"vip_expires_at": exp})
+            self.assertGreaterEqual(days, 29)
+            self.assertLessEqual(days, 30)
+
+        _aio.run(run())
+
+    def test_group_guard_classify(self):
+        """🔐 تشخیص نوع پیام برای قفل‌ها."""
+        sticker_msg = SimpleNamespace(sticker=object(), animation=None, video_note=None, video=None,
+                                      photo=None, audio=None, voice=None, document=None,
+                                      forward_origin=None, forward_date=None, text=None, caption=None,
+                                      entities=None, caption_entities=None, has_media_spoiler=False)
+        self.assertEqual(group_guard.classify_message(sticker_msg), "sticker")
+        link_msg = SimpleNamespace(sticker=None, animation=None, video_note=None, video=None,
+                                   photo=None, audio=None, voice=None, document=None,
+                                   forward_origin=None, forward_date=None, text="ببین https://example.com",
+                                   caption=None, entities=None, caption_entities=None, has_media_spoiler=False)
+        self.assertEqual(group_guard.classify_message(link_msg), "link")
+        fwd_msg = SimpleNamespace(sticker=None, animation=None, video_note=None, video=None,
+                                  photo=None, audio=None, voice=None, document=None,
+                                  forward_origin=object(), forward_date=123, text=None,
+                                  caption=None, entities=None, caption_entities=None, has_media_spoiler=False)
+        self.assertEqual(group_guard.classify_message(fwd_msg), "forward")
 
 
 if __name__ == "__main__":

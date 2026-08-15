@@ -75,6 +75,8 @@ from calendar_service import (
     today_info as cal_today_info,
     today_jalali as cal_today_jalali,
 )
+import vip_service
+import group_guard
 from tools_service import (
     book_search,
     country_info,
@@ -261,6 +263,19 @@ reminders_col = db["user_reminders"]
 reviews_col = db["user_reviews"]
 media_jobs_col = db["media_jobs"]
 media_file_cache_col = db["media_file_cache"]  # کش file_id بر اساس URL (برای جلوگیری از دانلود تکراری)
+vip_orders_col = db["vip_orders"]  # سفارش‌های خرید اشتراک پرمیوم
+
+# اتصال ماژول vip_service به کالکشن‌ها
+vip_service.users_col = users_col
+vip_service.vip_orders_col = vip_orders_col
+vip_service.settings_col = settings_col
+vip_service.log = log
+
+# اتصال group_guard به کالکشن‌ها
+group_guard.group_settings_col = group_settings_col
+group_guard.users_col = users_col
+group_guard.warnings_col = warnings_col
+group_guard.log = log
 
 ai_service = AIService(AIConfig.from_env(), ai_usage_col, ai_provider_metrics_col, users_col)
 
@@ -1416,6 +1431,8 @@ music_search_cache: dict[int, list[dict]] = {}
 quick_quiz_recent: dict[int, list[int]] = {}
 hokm_rooms: dict[str, HokmGame] = {}  # اتاق‌های بازی حکم آنلاین (حافظه + Redis)
 youtube_quality_sessions: dict[int, dict] = {}  # {user_id: {"url": ..., "formats": [...]}}
+vip_card_sessions: set[int] = set()  # ادمین در حال وارد کردن شماره کارت برای سفارش
+vip_receipt_sessions: set[int] = set()  # کاربر در حال ارسال رسید برای سفارش
 duel_rooms: dict[str, dict] = {}  # اتاق‌های دوئل ۱v۱
 
 
@@ -2737,8 +2754,9 @@ def main_menu(user_id: int | None = None):
          InlineKeyboardButton(text="🔐 کانفیگ اختصاصی", callback_data="config_menu")],
         [InlineKeyboardButton(text="💳 کیف پول", callback_data="wallet"),
          InlineKeyboardButton(text="👤 پروفایل من", callback_data="profile_user")],
-        [InlineKeyboardButton(text="🎟 کد هدیه", callback_data="gift_help"),
-         InlineKeyboardButton(text="🎯 مأموریت‌های جایزه", callback_data="user_missions")],
+        [InlineKeyboardButton(text="👑 اشتراک پرمیوم", callback_data="vip_menu"),
+         InlineKeyboardButton(text="🎟 کد هدیه", callback_data="gift_help")],
+        [InlineKeyboardButton(text="🎯 مأموریت‌های جایزه", callback_data="user_missions")],
         [InlineKeyboardButton(text="📖 معرفی سوپرربات", callback_data="about_bot")],
         [InlineKeyboardButton(text="💬 پشتیبانی و پیشنهاد", callback_data="support"),
          InlineKeyboardButton(text="📣 کانال داغ‌ها", url=CHANNEL_LINK)],
@@ -3535,6 +3553,8 @@ def admin_menu():
         [InlineKeyboardButton(text="📈 پست خودکار نرخ ارز در کانال", callback_data="toggle_auto_rates")],
         [InlineKeyboardButton(text="⭐ تنظیمات پرداخت ستاره", callback_data="admin_stars_settings"),
          InlineKeyboardButton(text="🍷 فال روزانه صبحگاهی", callback_data="toggle_daily_fal")],
+        [InlineKeyboardButton(text="👑 درخواست‌های اشتراک پرمیوم", callback_data="admin_vip_orders"),
+         InlineKeyboardButton(text="🛡 پنل مدیریت گروه‌ها", callback_data="admin_group_panel")],
         [InlineKeyboardButton(text="🔙 منوی اصلی", callback_data="back_main")],
     ])
 
@@ -7692,6 +7712,12 @@ async def cancel_guess(message: types.Message):
     elif user_id in repost_cta_sessions:
         repost_cta_sessions.discard(user_id)
         await message.answer("❌ ویرایش متن دعوت لغو شد.")
+    elif user_id in vip_card_sessions:
+        vip_card_sessions.discard(user_id)
+        await message.answer("❌ ارسال شماره کارت لغو شد.")
+    elif user_id in vip_receipt_sessions:
+        vip_receipt_sessions.discard(user_id)
+        await message.answer("❌ ارسال رسید لغو شد.")
     elif user_id in economy_setting_sessions:
         economy_setting_sessions.pop(user_id, None)
         await message.answer("❌ تغییر تنظیم اقتصادی لغو شد.")
@@ -7790,6 +7816,37 @@ async def handle_numeric_input(message: types.Message):
         runtime_settings["repost_cta"] = message.text[:300]
         await settings_col.update_one({"_id": "runtime"}, {"$set": {"repost_cta": message.text[:300]}}, upsert=True)
         return await message.answer(f"✅ متن دعوت بازنشر ذخیره شد:\n\n{message.text[:300]}")
+    # --- ادمین در حال ارسال شماره کارت برای سفارش اشتراک ---
+    if user_id in vip_card_sessions and is_admin(user_id):
+        vip_card_sessions.discard(user_id)
+        order = await vip_orders_col.find_one({"status": "pending"}, sort=[("created_at", 1)])
+        if not order:
+            return await message.answer("❌ سفارش در انتظار پرداخت پیدا نشد.", reply_markup=admin_menu())
+        card_text = (message.text or "").strip()
+        if not card_text:
+            return await message.answer("❌ شماره کارت خالی است؛ دوباره بفرست.")
+        await vip_service.set_card(order["_id"], card_text)
+        await message.answer(
+            f"✅ شماره کارت برای سفارش <code>{order['_id']}</code> ثبت شد و برای کاربر ارسال گردید.",
+            parse_mode="HTML",
+            reply_markup=admin_menu(),
+        )
+        try:
+            await bot.send_message(
+                order["user_id"],
+                f"💳 <b>پرداخت اشتراک پرمیوم</b>\n\n"
+                f"📦 پلن: {order['plan_title']} — {order['price']:,} تومان\n"
+                f"🆔 سفارش: <code>{order['_id']}</code>\n\n"
+                f"🏦 <b>شماره کارت:</b>\n<code>{html.escape(card_text)}</code>\n\n"
+                "پس از واریز، دکمهٔ زیر را بزن و <b>عکس رسید</b> را ارسال کن:",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="🖼 ارسال رسید پرداخت", callback_data="vip_send_receipt")],
+                ]),
+            )
+        except (TelegramForbiddenError, TelegramBadRequest):
+            pass
+        return
     if user_id in economy_setting_sessions and is_admin(user_id):
         key = economy_setting_sessions.pop(user_id)
         value = int(message.text)
@@ -14099,6 +14156,41 @@ async def handle_video_round_request(message: types.Message) -> None:
 
 @dp.message(F.photo)
 async def handle_admin_receipt_photo(message: types.Message):
+    # --- رسید پرداخت اشتراک پرمیوم ---
+    if message.from_user.id in vip_receipt_sessions:
+        vip_receipt_sessions.discard(message.from_user.id)
+        order = await vip_orders_col.find_one({
+            "user_id": message.from_user.id,
+            "status": "waiting_receipt",
+        })
+        if not order:
+            return await message.answer("❌ سفارش فعالی برای ارسال رسید پیدا نشد.", reply_markup=main_menu(message.from_user.id))
+        photo_id = message.photo[-1].file_id
+        await vip_service.mark_receipt(order["_id"], photo_id)
+        await message.answer(
+            "✅ رسید شما دریافت شد و برای بررسی مدیریت ارسال گردید. به محض تأیید، اشتراک شما فعال می‌شود.",
+            reply_markup=main_menu(message.from_user.id),
+        )
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_photo(
+                    admin_id,
+                    photo_id,
+                    caption=(
+                        f"🖼 <b>رسید پرداخت اشتراک پرمیوم</b>\n"
+                        f"👤 کاربر: <code>{message.from_user.id}</code>\n"
+                        f"📦 پلن: {order['plan_title']} — {order['price']:,} تومان\n"
+                        f"🆔 سفارش: <code>{order['_id']}</code>"
+                    ),
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text="✅ تأیید و فعال‌سازی", callback_data=f"vip_approve:{order['_id']}")],
+                        [InlineKeyboardButton(text="❌ رد سفارش", callback_data=f"vip_reject:{order['_id']}")],
+                    ]),
+                )
+            except (TelegramForbiddenError, TelegramBadRequest):
+                pass
+        return
     service_order_id = service_receipt_sessions.get(message.from_user.id)
     if service_order_id:
         order = await service_orders_col.find_one({"_id": service_order_id, "user_id": message.from_user.id, "status": "awaiting_receipt"})
@@ -17830,6 +17922,503 @@ async def keepalive_ping_worker():
             raise
         except Exception as exc:
             log.warning("self-ping error: %s", exc)
+
+
+# ================== سیستم اشتراک پرمیوم (VIP) ==================
+
+def vip_plans_keyboard() -> InlineKeyboardMarkup:
+    rows = []
+    for plan in vip_service.VIP_PLANS:
+        rows.append([InlineKeyboardButton(
+            text=f"{plan['emoji']} {plan['title']} — {plan['price']:,} تومان",
+            callback_data=f"vip_choose:{plan['months']}",
+        )])
+    rows.append([InlineKeyboardButton(text="🔙 منوی اصلی", callback_data="back_main")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def vip_status_text(user_id: int, user: dict) -> str:
+    days = vip_service.vip_remaining_days(user)
+    if days > 0:
+        exp = vip_service.vip_expiry(user)
+        exp_str = exp.strftime("%Y/%m/%d") if exp else "?"
+        return (
+            f"👑 <b>وضعیت اشتراک شما</b>\n\n"
+            f"✅ اشتراک <b>ویژه</b> فعال است\n"
+            f"⏳ {days:,} روز باقی‌مانده (تا {exp_str})\n\n"
+            "از تمامی امکانات ویژه در گروه‌ها استفاده کنید. ✨"
+        )
+    return (
+        "👑 <b>اشتراک پرمیوم</b>\n\n"
+        "شما هنوز اشتراک ویژه ندارید. با خرید اشتراک، قفل‌های گروه برای شما باز می‌شود و "
+        "امکانات ویژه فعال می‌گردد:\n"
+        "🔓 ارسال آزادانه استیکر/ویدئو/گیف/لینک در گروه‌های قفل‌دار\n"
+        "🚀 بدون محدودیت ضد اسپم و خاموشی\n"
+        "📊 آمار و امکانات ویژه\n\n"
+        "👇 یکی از پلن‌ها را انتخاب کنید:"
+    )
+
+
+@dp.callback_query(F.data == "vip_menu")
+async def vip_menu_callback(callback: types.CallbackQuery):
+    user = await users_col.find_one({"_id": callback.from_user.id}) or {}
+    await callback.message.answer(
+        vip_status_text(callback.from_user.id, user),
+        parse_mode="HTML",
+        reply_markup=vip_plans_keyboard(),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "vip_send_receipt")
+async def vip_send_receipt_callback(callback: types.CallbackQuery):
+    order = await vip_orders_col.find_one({"user_id": callback.from_user.id, "status": "waiting_receipt"})
+    if not order:
+        return await callback.answer("سفارش فعالی در انتظار رسید نیست.", show_alert=True)
+    vip_receipt_sessions.add(callback.from_user.id)
+    await callback.message.answer(
+        "🖼 <b>ارسال رسید پرداخت</b>\n\n"
+        "لطفاً <b>عکس رسید</b> (اسکرین‌شات از صفحهٔ واریز) را همین‌جا ارسال کن.\n"
+        "بعد از بررسی و تأیید مدیریت، اشتراکت فعال می‌شود. ✅",
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("vip_choose:"))
+async def vip_choose_callback(callback: types.CallbackQuery):
+    try:
+        months = int(callback.data.split(":", 1)[1])
+    except (ValueError, IndexError):
+        return await callback.answer("پلن نامعتبر است.", show_alert=True)
+    plan = vip_service.plan_by_months(months)
+    if not plan:
+        return await callback.answer("پلن نامعتبر است.", show_alert=True)
+    try:
+        order = await vip_service.create_order(callback.from_user.id, months)
+    except ValueError as exc:
+        code, msg = exc.args
+        return await callback.answer(msg, show_alert=True)
+    await callback.message.answer(
+        f"🧾 <b>پیش‌فاکتور خرید اشتراک</b>\n\n"
+        f"{plan['emoji']} پلن: <b>{plan['title']}</b>\n"
+        f"💰 مبلغ: <b>{plan['price']:,} تومان</b>\n"
+        f"📌 کد سفارش: <code>{order['_id']}</code>\n\n"
+        "⏳ در انتظار ارسال شماره کارت توسط مدیریت...\n"
+        "به محض آماده شدن، شماره کارت و اطلاعات پرداخت برات ارسال می‌شود.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 پنل اشتراک", callback_data="vip_menu")],
+            [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="back_main")],
+        ]),
+    )
+    # اطلاع به ادمین‌ها
+    for admin_id in ADMIN_IDS:
+        try:
+            await bot.send_message(
+                admin_id,
+                f"🛒 <b>درخواست خرید اشتراک جدید</b>\n\n"
+                f"👤 کاربر: <code>{callback.from_user.id}</code>\n"
+                f"{plan['emoji']} پلن: {plan['title']}\n"
+                f"💰 مبلغ: {plan['price']:,} تومان\n"
+                f"🆔 کد سفارش: <code>{order['_id']}</code>",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="💳 ارسال شماره کارت", callback_data=f"vip_send_card:{order['_id']}")],
+                ]),
+            )
+        except (TelegramForbiddenError, TelegramBadRequest):
+            pass
+    await callback.answer("سفارش ثبت شد ✅")
+
+
+@dp.callback_query(F.data.startswith("vip_send_card:"))
+async def vip_send_card_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+    order_id = callback.data.split(":", 1)[1]
+    order = await vip_orders_col.find_one({"_id": order_id})
+    if not order:
+        return await callback.answer("سفارش پیدا نشد.", show_alert=True)
+    vip_card_sessions.add(callback.from_user.id)
+    await callback.message.answer(
+        f"💳 <b>ارسال شماره کارت برای سفارش</b>\n\n"
+        f"🆔 سفارش: <code>{order_id}</code>\n"
+        f"👤 کاربر: <code>{order['user_id']}</code>\n"
+        f"📦 پلن: {order['plan_title']} — {order['price']:,} تومان\n\n"
+        "شماره کارت + نام صاحب کارت را در یک پیام بفرست.\n"
+        "مثال:\n<code>6104-3375-1234-5678\nعلی محمدی</code>\n/cancel",
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("vip_approve:"))
+async def vip_approve_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+    order_id = callback.data.split(":", 1)[1]
+    result = await vip_service.approve_order(order_id, callback.from_user.id)
+    if not result:
+        return await callback.answer("سفارش پیدا نشد.", show_alert=True)
+    order = await vip_orders_col.find_one({"_id": order_id})
+    try:
+        await callback.message.edit_text(
+            f"✅ سفارش <code>{order_id}</code> تأیید و اشتراک کاربر فعال شد.\n"
+            f"👤 کاربر: <code>{order['user_id']}</code>\n"
+            f"📦 پلن: {order['plan_title']}",
+            parse_mode="HTML",
+        )
+    except TelegramBadRequest:
+        pass
+    try:
+        await bot.send_message(
+            order["user_id"],
+            f"🎉 <b>اشتراک پرمیوم شما فعال شد!</b>\n\n"
+            f"👑 پلن: {order['plan_title']}\n"
+            f"📅 اعتبار تا: {result['new_expires_at'].strftime('%Y/%m/%d')}\n\n"
+            "حالا از تمامی امکانات ویژه استفاده کنید! ✨",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="👑 مشاهده وضعیت اشتراک", callback_data="vip_menu")],
+            ]),
+        )
+    except (TelegramForbiddenError, TelegramBadRequest):
+        pass
+    await callback.answer("✅ تأیید شد")
+
+
+@dp.callback_query(F.data.startswith("vip_reject:"))
+async def vip_reject_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+    order_id = callback.data.split(":", 1)[1]
+    result = await vip_service.reject_order(order_id, callback.from_user.id)
+    if not result:
+        return await callback.answer("سفارش پیدا نشد.", show_alert=True)
+    order = await vip_orders_col.find_one({"_id": order_id})
+    try:
+        await callback.message.edit_text(f"❌ سفارش <code>{order_id}</code> رد شد.", parse_mode="HTML")
+    except TelegramBadRequest:
+        pass
+    try:
+        await bot.send_message(
+            order["user_id"],
+            "❌ متأسفانه سفارش اشتراک شما رد شد. در صورت نیاز با پشتیبانی تماس بگیرید.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="👑 تلاش مجدد", callback_data="vip_menu")],
+            ]),
+        )
+    except (TelegramForbiddenError, TelegramBadRequest):
+        pass
+    await callback.answer("❌ رد شد")
+
+
+async def admin_vip_orders_menu(message_or_callback) -> None:
+    orders = await vip_service.list_open_orders(15)
+    if not orders:
+        text = "📭 هیچ درخواست اشتراک بازِ در انتظار پرداخت وجود ندارد."
+    else:
+        lines = ["📋 <b>درخواست‌های خرید اشتراک</b>", ""]
+        for order in orders:
+            status_map = {"pending": "⏳ در انتظار کارت", "waiting_receipt": "💳 کارت ارسال شد", "payment_review": "🖼 رسید ارسال شده"}
+            lines.append(
+                f"• <code>{order['_id']}</code>\n"
+                f"  👤 {order['user_id']} · {order['plan_title']} · {order['price']:,} ت\n"
+                f"  {status_map.get(order['status'], order['status'])}"
+            )
+        text = "\n".join(lines)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔙 پنل مدیریت", callback_data="admin_panel")],
+    ])
+    if hasattr(message_or_callback, "message"):
+        await message_or_callback.message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+    else:
+        await message_or_callback.answer(text, parse_mode="HTML", reply_markup=keyboard)
+
+
+@dp.callback_query(F.data == "admin_vip_orders")
+async def admin_vip_orders_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+    await admin_vip_orders_menu(callback)
+    await callback.answer()
+
+
+# ================== اجرای قفل‌های گروه و ضد اسپم ==================
+
+@dp.message(F.chat.type.in_({"group", "supergroup"}))
+async def group_guard_handler(message: types.Message):
+    """محافظ گروه: قفل‌ها، خاموشی و ضد اسپم برای کاربران عادی."""
+    chat_id = message.chat.id
+    user_id = message.from_user.id
+    try:
+        config = await group_guard.get_group_config(chat_id)
+    except Exception:
+        config = None
+    if not config:
+        return
+    # مدیران و ربات از همه‌چیز معاف‌اند
+    try:
+        member = await bot.get_chat_member(chat_id, user_id)
+        if member.status in {"creator", "administrator"}:
+            return
+    except Exception:
+        pass
+    is_vip_user = False
+    try:
+        is_vip_user = await group_guard.is_vip(user_id)
+    except Exception:
+        pass
+
+    # ۱) خاموشی
+    try:
+        if await group_guard.is_shutdown_active(config, group_guard.now_utc()):
+            if not is_vip_user:
+                try:
+                    await message.delete()
+                except Exception:
+                    pass
+                try:
+                    await message.answer("🔇 گروه موقتاً خاموش است؛ لطفاً بعداً پیام بده.", reply_to_message_id=message.message_id)
+                except Exception:
+                    pass
+                return
+    except Exception:
+        pass
+
+    # ۲) ضد اسپم (قبل از قفل‌ها ثبت و بررسی می‌شود)
+    try:
+        action = await group_guard.check_antispam(chat_id, user_id, config)
+        await group_guard.record_message(chat_id, user_id)
+        if action and not is_vip_user:
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            if action in {"mute", "ban"}:
+                try:
+                    if action == "mute":
+                        await bot.restrict_chat_member(chat_id, user_id, permissions=types.ChatPermissions(can_send_messages=False), until_date=int(group_guard.now_utc().timestamp()) + 3600)
+                    else:
+                        await bot.ban_chat_member(chat_id, user_id)
+                except Exception:
+                    pass
+            elif action == "warn":
+                try:
+                    await message.answer("⚠️ پیام شما به دلیل اسپم حذف شد.", reply_to_message_id=message.message_id)
+                except Exception:
+                    pass
+            return
+    except Exception:
+        pass
+
+    # ۳) قفل‌ها
+    msg_type = group_guard.classify_message(message)
+    if msg_type and not is_vip_user:
+        locked = (config.get("locks") or {}).get(msg_type, False)
+        if locked:
+            try:
+                await message.delete()
+            except Exception:
+                pass
+            try:
+                await message.answer(
+                    f"🔒 ارسال «{group_guard.LOCKS.get(msg_type, msg_type)}» در این گروه قفل است.",
+                    reply_to_message_id=message.message_id,
+                )
+            except Exception:
+                pass
+            return
+
+
+# ================== پنل مدیریت گروه (ادمین) ==================
+
+def group_locks_keyboard(chat_id: int, config: dict) -> InlineKeyboardMarkup:
+    rows = []
+    locks = config.get("locks") or {}
+    for key, label in group_guard.LOCKS.items():
+        state = "🔓" if not locks.get(key) else "🔒"
+        rows.append([InlineKeyboardButton(
+            text=f"{state} {label}",
+            callback_data=f"gplock:{chat_id}:{key}",
+        )])
+    rows.append([InlineKeyboardButton(text="🔙 پنل مدیریت گروه", callback_data=f"gpanel:{chat_id}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def group_panel_kb(chat_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔐 قفل‌ها", callback_data=f"glocks:{chat_id}")],
+        [InlineKeyboardButton(text="⛔ ضد اسپم", callback_data=f"gspam:{chat_id}")],
+        [InlineKeyboardButton(text="💤 خاموشی", callback_data=f"gshut:{chat_id}")],
+        [InlineKeyboardButton(text="👑 کاربران ویژه", callback_data=f"gvip:{chat_id}")],
+        [InlineKeyboardButton(text="🔙 پنل مدیریت", callback_data="admin_panel")],
+    ])
+
+
+async def require_group_admin(chat_id: int, user_id: int) -> bool:
+    if is_owner(user_id):
+        return True
+    try:
+        member = await bot.get_chat_member(chat_id, user_id)
+        return member.status in {"creator", "administrator"}
+    except Exception:
+        return False
+
+
+@dp.callback_query(F.data == "admin_group_panel")
+async def admin_group_panel_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+    await callback.message.answer(
+        "🛡 <b>پنل مدیریت گروه‌ها</b>\n\n"
+        "ربات را به گروه/سوپرگروه خود اضافه کنید و آن را ادمین کنید.\n"
+        "سپس یکی از گروه‌های زیر را انتخاب کنید:",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 پنل مدیریت", callback_data="admin_panel")],
+        ]),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("gpanel:"))
+async def gpanel_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔ دسترسی ندارید!", show_alert=True)
+    chat_id = int(callback.data.split(":", 1)[1])
+    if not await require_group_admin(chat_id, callback.from_user.id):
+        return await callback.answer("ربات در این گروه ادمین نیست.", show_alert=True)
+    await callback.message.answer(f"🛡 <b>پنل مدیریت گروه</b>\n<code>{chat_id}</code>", parse_mode="HTML",
+                                  reply_markup=group_panel_kb(chat_id))
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("glocks:"))
+async def glocks_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    chat_id = int(callback.data.split(":", 1)[1])
+    config = await group_guard.get_group_config(chat_id)
+    await callback.message.answer(
+        "🔐 <b>قفل‌های گروه</b>\n\n"
+        "هر قفل که فعال باشد، کاربر عادی نمی‌تواند آن نوع پیام را بفرستد. کاربران ویژه آزادند.",
+        parse_mode="HTML",
+        reply_markup=group_locks_keyboard(chat_id, config),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("gplock:"))
+async def gplock_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    _, chat_id_s, key = callback.data.split(":", 2)
+    chat_id = int(chat_id_s)
+    config = await group_guard.get_group_config(chat_id)
+    config["locks"][key] = not config["locks"].get(key, False)
+    await group_guard.save_group_config(chat_id, {"locks": config["locks"]})
+    await callback.message.edit_text(
+        "🔐 <b>قفل‌های گروه</b>\n\n"
+        "هر قفل که فعال باشد، کاربر عادی نمی‌تواند آن نوع پیام را بفرستد. کاربران ویژه آزادند.",
+        parse_mode="HTML",
+        reply_markup=group_locks_keyboard(chat_id, config),
+    )
+    await callback.answer("✅ ذخیره شد")
+
+
+@dp.callback_query(F.data.startswith("gspam:"))
+async def gspam_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    chat_id = int(callback.data.split(":", 1)[1])
+    config = await group_guard.get_group_config(chat_id)
+    anti = config.get("antispam") or {}
+    status = "✅ فعال" if anti.get("enabled") else "⛔ غیرفعال"
+    await callback.message.answer(
+        f"⛔ <b>ضد اسپم گروه</b>\n\n"
+        f"وضعیت: {status}\n"
+        f"📊 {anti.get('max_messages', 5)} پیام در {anti.get('window_minutes', 1)} دقیقه\n"
+        f"⚙️ واکنش: {anti.get('action', 'warn')}\n\n"
+        "کاربران ویژه از ضد اسپم معاف‌اند.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 فعال/غیرفعال", callback_data=f"gspamt:{chat_id}")],
+            [InlineKeyboardButton(text="🔙 پنل گروه", callback_data=f"gpanel:{chat_id}")],
+        ]),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("gspamt:"))
+async def gspamt_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    chat_id = int(callback.data.split(":", 1)[1])
+    config = await group_guard.get_group_config(chat_id)
+    config["antispam"]["enabled"] = not config["antispam"].get("enabled", False)
+    await group_guard.save_group_config(chat_id, {"antispam": config["antispam"]})
+    await gspam_callback(callback)
+    await callback.answer("✅ ذخیره شد")
+
+
+@dp.callback_query(F.data.startswith("gshut:"))
+async def gshut_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    chat_id = int(callback.data.split(":", 1)[1])
+    config = await group_guard.get_group_config(chat_id)
+    shutdown = config.get("shutdown") or {}
+    status = "✅ فعال" if shutdown.get("enabled") else "⛔ غیرفعال"
+    duration = ""
+    if shutdown.get("duration_until"):
+        duration = f" (تا {shutdown['duration_until']})"
+    await callback.message.answer(
+        f"💤 <b>خاموشی گروه</b>\n\n"
+        f"وضعیت: {status}\n"
+        f"⏰ خاموش خودکار: {shutdown.get('auto_off') or '—'}\n"
+        f"⏰ روشن خودکار: {shutdown.get('auto_on') or '—'}\n"
+        f"⏳ خاموشی مدت‌دار: {duration or '—'}\n\n"
+        "کاربران ویژه در خاموشی هم می‌توانند پیام بفرستند.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔄 فعال/غیرفعال", callback_data=f"gshutt:{chat_id}")],
+            [InlineKeyboardButton(text="🔙 پنل گروه", callback_data=f"gpanel:{chat_id}")],
+        ]),
+    )
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("gshutt:"))
+async def gshutt_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    chat_id = int(callback.data.split(":", 1)[1])
+    config = await group_guard.get_group_config(chat_id)
+    config["shutdown"]["enabled"] = not config["shutdown"].get("enabled", False)
+    if not config["shutdown"]["enabled"]:
+        config["shutdown"]["duration_until"] = None
+    await group_guard.save_group_config(chat_id, {"shutdown": config["shutdown"]})
+    await gshut_callback(callback)
+    await callback.answer("✅ ذخیره شد")
+
+
+@dp.callback_query(F.data.startswith("gvip:"))
+async def gvip_callback(callback: types.CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return await callback.answer("⛔", show_alert=True)
+    chat_id = int(callback.data.split(":", 1)[1])
+    await callback.message.answer(
+        "👑 <b>کاربران ویژه</b>\n\n"
+        "کاربرانی که اشتراک پرمیوم (VIP) داشته باشند، از همهٔ قفل‌ها، ضد اسپم و خاموشی معاف‌اند.\n\n"
+        "برای مدیریت اشتراک‌ها از «👑 درخواست‌های اشتراک پرمیوم» در پنل مدیریت استفاده کنید.",
+        parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔙 پنل گروه", callback_data=f"gpanel:{chat_id}")],
+        ]),
+    )
+    await callback.answer()
 
 
 @dp.errors()

@@ -30,7 +30,7 @@ COPY --from=botapi /usr/local/bin/telegram-bot-api /usr/local/bin/telegram-bot-a
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY bot.py prompt_catalog.py greeting_catalog.py iranian_music_catalog.py ai_service.py media_service.py instagram_comment_service.py music_service.py hokm_engine.py tools_service.py calendar_service.py prayer_service.py vip_service.py group_guard.py googlec331ce8b78c548bd.html start.sh ./
+COPY bot.py prompt_catalog.py greeting_catalog.py iranian_music_catalog.py ai_service.py media_service.py instagram_comment_service.py music_service.py hokm_engine.py tools_service.py calendar_service.py prayer_service.py vip_service.py group_guard.py anon_chat.py googlec331ce8b78c548bd.html start.sh ./
 COPY webapp ./webapp
 
 EXPOSE 8080 10000
